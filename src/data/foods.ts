@@ -1,0 +1,17 @@
+export const foods = [
+  { name: "Phở bò", address: "Q.3", discount: "Giảm 20%", img: "/pho-bo.jpg", price: 50000 },
+  { name: "Cơm tấm", address: "Phú Nhuận", discount: "Giảm 10%", img: "/com-tam.jpg", price: 35000 },
+  { name: "Bún chả", address: "Q.1", discount: "Giảm 15%", img: "/bun-cha.jpg", price: 25000 },
+  { name: "Lẩu thái", address: "Q.5", discount: "Giảm 25%", img: "/lau-thai.jpg", price: 120000 },
+  { name: "Hủ tiếu Nam Vang", address: "Q.10", discount: "Giảm 5%", img: "/hu-tieu.jpg", price: 40000 },
+  { name: "Bánh mì đặc biệt", address: "Q.4", discount: "Giảm 10%", img: "/banh-mi.jpg", price: 20000 },
+  { name: "Mì Quảng", address: "Q.7", discount: "Giảm 15%", img: "/mi-quang.jpg", price: 45000 },
+  { name: "Bánh cuốn", address: "Tân Bình", discount: "Giảm 20%", img: "/banh-cuon.jpg", price: 30000 },
+  { name: "Cháo lòng", address: "Q.6", discount: "Giảm 10%", img: "/chao-long.jpg", price: 28000 },
+  { name: "Gỏi cuốn", address: "Q.2", discount: "Giảm 15%", img: "/goi-cuon.jpg", price: 25000 },
+  { name: "Bánh xèo", address: "Q.11", discount: "Giảm 25%", img: "/banh-xeo.jpg", price: 50000 },
+  { name: "Cá kho tộ", address: "Q.8", discount: "Giảm 20%", img: "/ca-kho.jpg", price: 70000 },
+  { name: "Canh chua cá lóc", address: "Thủ Đức", discount: "Giảm 10%", img: "/canh-chua.jpg", price: 65000 },
+  { name: "Bún bò Huế", address: "Q.9", discount: "Giảm 15%", img: "/bun-bo-hue.jpg", price: 55000 },
+  { name: "Ốc luộc", address: "Bình Thạnh", discount: "Giảm 20%", img: "/oc-luoc.jpg", price: 60000 },
+];
