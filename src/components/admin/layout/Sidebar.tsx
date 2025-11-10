@@ -9,13 +9,19 @@ type TabType =
   | "restaurants-form"
   | "chatbot-files"
   | "chatbot-history"
-  | "upload-images";
+  | "upload-images"
+  // 👇 thêm mới:
+  | "blog-list"
+  | "blog-form"
+  | "comments";
 
 interface SidebarProps {
   activeTab: TabType;
   setActiveTab: Dispatch<SetStateAction<TabType>>;
-  openDropdown: "restaurants" | "chatbot" | "media" | null;
-  setOpenDropdown: Dispatch<SetStateAction<"restaurants" | "chatbot" | "media" | null>>;
+  openDropdown: "restaurants" | "chatbot" | "media" | "blog" | null; // 👈 thêm 'blog'
+  setOpenDropdown: Dispatch<
+    SetStateAction<"restaurants" | "chatbot" | "media" | "blog" | null>
+  >;
 }
 
 export default function Sidebar({
@@ -24,18 +30,18 @@ export default function Sidebar({
   openDropdown,
   setOpenDropdown,
 }: SidebarProps) {
-  const toggleDropdown = (menu: "restaurants" | "chatbot" | "media") => {
+  const toggleDropdown = (
+    menu: "restaurants" | "chatbot" | "media" | "blog"
+  ) => {
     setOpenDropdown(openDropdown === menu ? null : menu);
   };
 
   return (
     <aside className="w-64 bg-[#0d47a1] text-white flex flex-col shadow-lg">
-      {/* LOGO */}
       <div className="px-6 py-5 text-2xl font-bold tracking-wide border-b border-blue-700">
-        Duralux<span className="text-blue-200 ml-1">Admin</span>
+        Food<span className="text-blue-200 ml-1">Admin</span>
       </div>
 
-      {/* NAVIGATION */}
       <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto text-sm">
         {/* DASHBOARD */}
         <NavButton
@@ -63,6 +69,33 @@ export default function Sidebar({
             onClick={() => setActiveTab("restaurants-form")}
           />
         </DropdownGroup>
+
+        {/* BLOG */}
+        <DropdownGroup
+          label="Blog"
+          icon={<i className="fa-regular fa-newspaper"></i>}
+          isOpen={openDropdown === "blog"}
+          onToggle={() => toggleDropdown("blog")}
+        >
+          <SubNavButton
+            label="📝 Danh sách bài viết"
+            active={activeTab === "blog-list"}
+            onClick={() => setActiveTab("blog-list")}
+          />
+          <SubNavButton
+            label="➕ Thêm / Sửa bài viết"
+            active={activeTab === "blog-form"}
+            onClick={() => setActiveTab("blog-form")}
+          />
+        </DropdownGroup>
+
+        {/* COMMENTS moderation */}
+        <NavButton
+          icon={<i className="fa-regular fa-comments"></i>}
+          label="Duyệt bình luận"
+          active={activeTab === "comments"}
+          onClick={() => setActiveTab("comments")}
+        />
 
         {/* CHATBOT */}
         <DropdownGroup
@@ -105,15 +138,13 @@ export default function Sidebar({
         />
       </nav>
 
-      {/* FOOTER */}
       <div className="p-4 text-xs text-blue-100 border-t border-blue-800">
-        © 2025 Duralux CRM
+        © 2025
       </div>
     </aside>
   );
 }
 
-/* ==== COMPONENTS ==== */
 function NavButton({
   icon,
   label,
@@ -170,7 +201,9 @@ function DropdownGroup({
         {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
 
-      {isOpen && <div className="ml-9 mt-1 space-y-1 animate-fadeIn">{children}</div>}
+      {isOpen && (
+        <div className="ml-9 mt-1 space-y-1 animate-fadeIn">{children}</div>
+      )}
     </div>
   );
 }

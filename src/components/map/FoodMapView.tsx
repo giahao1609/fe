@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl, { Map, MapLayerMouseEvent } from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css";
-import axios from "axios";
 import { useRouter } from "next/navigation";
 import { useLocationStore } from "@/stores/locationStore";
 
@@ -19,18 +18,17 @@ type Restaurant = {
   district?: string;
   category?: string;
   priceRange?: string;
-  banner?: string | string[];
 };
 
-const HCM_BBOX: [number, number, number, number] = [
-  106.55, 10.68, 106.85, 10.9,
-];
+// ✅ Bật dữ liệu giả
+const USE_FAKE_NEARBY = true;
+
+const HCM_CENTER = { lng: 106.70098, lat: 10.77653 }; // Bưu điện TP
+const HCM_BBOX: [number, number, number, number] = [106.55, 10.68, 106.85, 10.9];
 
 export default function FoodMapView() {
-  const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "";
   const token = process.env.NEXT_PUBLIC_MAPBOX_API_KEY || "";
   const router = useRouter();
-
   const { lat, lng, mode, autoDetect } = useLocationStore();
 
   const mapElRef = useRef<HTMLDivElement | null>(null);
@@ -46,29 +44,25 @@ export default function FoodMapView() {
     if (mode === "prompt") autoDetect();
   }, [mode, autoDetect]);
 
-  // init map (1 lần khi có lat/lng)
+  // init map
   useEffect(() => {
     if (!token) {
       setError("Thiếu NEXT_PUBLIC_MAPBOX_API_KEY trong .env.local");
       return;
     }
-    if (!lat || !lng) return;
+    const center = (lat && lng) ? { lng, lat } : HCM_CENTER;
     if (!mapElRef.current || mapRef.current) return;
 
     const map = new mapboxgl.Map({
       container: mapElRef.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: [lng, lat],
+      center: [center.lng, center.lat],
       zoom: 14,
       cooperativeGestures: true,
       attributionControl: true,
     });
 
-    // controls
-    map.addControl(
-      new mapboxgl.NavigationControl({ visualizePitch: true }),
-      "top-right"
-    );
+    map.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), "top-right");
     map.addControl(new mapboxgl.FullscreenControl(), "top-right");
     map.addControl(
       new mapboxgl.GeolocateControl({
@@ -80,7 +74,7 @@ export default function FoodMapView() {
       "top-right"
     );
 
-    // load geocoder **sau khi map có**
+    // load geocoder
     (async () => {
       try {
         const mod = await import("@mapbox/mapbox-gl-geocoder");
@@ -92,7 +86,7 @@ export default function FoodMapView() {
           marker: false,
           zoom: 14,
           bbox: HCM_BBOX,
-          proximity: { longitude: 106.7, latitude: 10.78 },
+          proximity: { longitude: HCM_CENTER.lng, latitude: HCM_CENTER.lat },
           countries: "VN",
         });
         geocoderRef.current = geocoder;
@@ -107,12 +101,8 @@ export default function FoodMapView() {
     })();
 
     const onLoad = async () => {
-      // add user point
       if (!map.getSource("user-point")) {
-        map.addSource("user-point", {
-          type: "geojson",
-          data: pointFeature(lng, lat),
-        });
+        map.addSource("user-point", { type: "geojson", data: pointFeature(center.lng, center.lat) });
         map.addLayer({
           id: "user-point",
           type: "circle",
@@ -134,20 +124,13 @@ export default function FoodMapView() {
         }
       } catch {
         if (!map.hasImage("restaurant-icon")) {
-          map.addImage(
-            "restaurant-icon",
-            await generateDotIcon(32, "#e11d48"),
-            { sdf: false }
-          );
+          map.addImage("restaurant-icon", await generateDotIcon(32, "#e11d48"), { sdf: false });
         }
       }
 
-      // restaurants source + layer
+      // layer
       if (!map.getSource("restaurants")) {
-        map.addSource("restaurants", {
-          type: "geojson",
-          data: emptyFC(),
-        });
+        map.addSource("restaurants", { type: "geojson", data: emptyFC() });
         map.addLayer({
           id: "restaurants-symbol",
           type: "symbol",
@@ -157,6 +140,15 @@ export default function FoodMapView() {
             "icon-size": 0.8,
             "icon-allow-overlap": true,
             "icon-anchor": "bottom",
+            "text-field": ["get", "name"],
+            "text-offset": [0, 1.2],
+            "text-size": 11,
+            "text-optional": true,
+          },
+          paint: {
+            "text-color": "#111827",
+            "text-halo-width": 1,
+            "text-halo-color": "#ffffff",
           },
         });
 
@@ -164,17 +156,12 @@ export default function FoodMapView() {
           const id = e.features?.[0]?.properties?._id as string | undefined;
           if (id) router.push(`/restaurants/${id}`);
         });
-        map.on("mouseenter", "restaurants-symbol", () => {
-          map.getCanvas().style.cursor = "pointer";
-        });
-        map.on("mouseleave", "restaurants-symbol", () => {
-          map.getCanvas().style.cursor = "";
-        });
+        map.on("mouseenter", "restaurants-symbol", () => (map.getCanvas().style.cursor = "pointer"));
+        map.on("mouseleave", "restaurants-symbol", () => (map.getCanvas().style.cursor = ""));
       }
     };
 
     map.on("load", onLoad);
-
     mapRef.current = map;
 
     return () => {
@@ -194,51 +181,26 @@ export default function FoodMapView() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !lat || !lng) return;
-    const src = map.getSource("user-point") as
-      | mapboxgl.GeoJSONSource
-      | undefined;
+    const src = map.getSource("user-point") as mapboxgl.GeoJSONSource | undefined;
     src?.setData(pointFeature(lng, lat));
   }, [lat, lng]);
 
-  // fetch nearby (debounce + abort)
+  // ✅ Lấy quán giả quanh vị trí (thay cho gọi API)
   useEffect(() => {
-    if (!lat || !lng || !API_URL) return;
-    let ctrl: AbortController | null = new AbortController();
-    const t = setTimeout(async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await axios.get<Restaurant[]>(
-          `${API_URL}/restaurants/nearby`,
-          {
-            params: { lat, lng },
-            signal: ctrl?.signal,
-          }
-        );
-        setRestaurants(res.data || []);
-      } catch (e: any) {
-        if (e?.name !== "CanceledError" && e?.message !== "canceled") {
-          console.error("[Nearby] fetch error:", e);
-          setError("Không lấy được danh sách quán. Thử lại nhé.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
-    return () => {
-      clearTimeout(t);
-      ctrl?.abort();
-      ctrl = null;
-    };
-  }, [lat, lng, API_URL]);
+    const center = (lat && lng) ? { lng, lat } : HCM_CENTER;
+    setLoading(true);
+    setError(null);
+    // tạo 24 điểm giả đa dạng
+    const fake = getSampleNearby(center.lng, center.lat, 24);
+    setRestaurants(fake);
+    setLoading(false);
+  }, [lat, lng]);
 
-  // đổ restaurants vào source (layer symbol)
+  // đổ restaurants vào source
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const src = map.getSource("restaurants") as
-      | mapboxgl.GeoJSONSource
-      | undefined;
+    const src = map.getSource("restaurants") as mapboxgl.GeoJSONSource | undefined;
     if (!src) return;
     src.setData({
       type: "FeatureCollection",
@@ -259,29 +221,23 @@ export default function FoodMapView() {
 
   const recenter = () => {
     const map = mapRef.current;
-    if (map && lat && lng) {
-      map.flyTo({
-        center: [lng, lat],
-        zoom: Math.max(map.getZoom(), 14),
-        speed: 0.9,
-        curve: 1.4,
-      });
+    if (map && (lat && lng)) {
+      map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 14), speed: 0.9, curve: 1.4 });
+    } else if (map) {
+      map.flyTo({ center: [HCM_CENTER.lng, HCM_CENTER.lat], zoom: 14 });
     }
   };
 
   const countLabel = useMemo(() => {
     if (loading) return "Đang tải...";
-    return restaurants.length > 0
-      ? `${restaurants.length} kết quả gần đây`
-      : "Không có kết quả gần đây";
+    return restaurants.length > 0 ? `${restaurants.length} kết quả gần đây` : "Không có kết quả gần đây";
   }, [restaurants.length, loading]);
 
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm text-gray-600">
-          <span className="font-medium text-gray-800">Quanh bạn</span> ·{" "}
-          {countLabel}
+          <span className="font-medium text-gray-800">Quanh bạn</span> · {countLabel}
           {error ? <span className="ml-2 text-rose-600">{error}</span> : null}
         </div>
         <div className="flex items-center gap-2">
@@ -296,23 +252,16 @@ export default function FoodMapView() {
 
       {!token && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          Thiếu <code>NEXT_PUBLIC_MAPBOX_API_KEY</code> trong{" "}
-          <code>.env.local</code>.
+          Thiếu <code>NEXT_PUBLIC_MAPBOX_API_KEY</code> trong <code>.env.local</code>.
         </div>
       )}
 
-      <div
-        ref={mapElRef}
-        className="h-[600px] w-full rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white"
-      />
+      <div ref={mapElRef} className="h-[600px] w-full rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-white" />
 
       {loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="rounded-xl border border-gray-100 p-4 bg-white"
-            >
+            <div key={i} className="rounded-xl border border-gray-100 p-4 bg-white">
               <div className="h-36 rounded-lg bg-gray-100 animate-pulse" />
               <div className="mt-3 h-4 w-2/3 rounded bg-gray-100 animate-pulse" />
               <div className="mt-2 h-3 w-1/2 rounded bg-gray-100 animate-pulse" />
@@ -324,24 +273,17 @@ export default function FoodMapView() {
   );
 }
 
-/* helpers */
+/* ============ helpers ============ */
 
 function emptyFC(): GeoJSON.FeatureCollection {
   return { type: "FeatureCollection", features: [] };
 }
 
 function pointFeature(lon: number, lat: number): GeoJSON.Feature {
-  return {
-    type: "Feature",
-    geometry: { type: "Point", coordinates: [lon, lat] },
-    properties: {},
-  };
+  return { type: "Feature", geometry: { type: "Point", coordinates: [lon, lat] }, properties: {} };
 }
 
-function loadMapImage(
-  map: Map,
-  url: string
-): Promise<HTMLImageElement | ImageBitmap> {
+function loadMapImage(map: Map, url: string): Promise<HTMLImageElement | ImageBitmap> {
   return new Promise((resolve, reject) => {
     map.loadImage(url, (err, img) => {
       if (err || !img) return reject(err || new Error("Cannot load image"));
@@ -359,4 +301,47 @@ async function generateDotIcon(size = 32, color = "#e11d48") {
   ctx.fillStyle = color;
   ctx.fill();
   return await createImageBitmap(c);
+}
+
+// ✅ Sinh dữ liệu giả quanh center (lng/lat). Có danh mục + quận phổ biến.
+function getSampleNearby(centerLng: number, centerLat: number, count = 20): Restaurant[] {
+  const districts = ["Q1", "Q3", "Q5", "Q10", "Q11", "Phú Nhuận", "Bình Thạnh", "Thủ Đức", "Q4", "Q7"];
+  const categories = ["Lẩu/Nướng", "Bún/Phở", "Cà phê", "Ăn vặt", "Món Nhật", "Món Hàn", "Món Ý", "Hải sản"];
+  const priceRanges = ["50k-80k", "80k-120k", "120k-180k", "180k+"];
+
+  const namesA = ["Phở", "Bún", "Cơm", "Lẩu", "Cafe", "Sushi", "Gà rán", "Pizza", "Ốc", "Bánh mì", "Bánh xèo", "Gỏi cuốn"];
+  const namesB = ["Nhà", "Phố", "Quê", "88", "Corner", "Station", "Express", "Garden", "Xưa", "Modern"];
+
+  const out: Restaurant[] = [];
+  for (let i = 0; i < count; i++) {
+    // jitter ~ 800m x 800m quanh center
+    const jitterLng = (Math.random() - 0.5) * 0.015;
+    const jitterLat = (Math.random() - 0.5) * 0.015;
+    const lon = clamp(centerLng + jitterLng, HCM_BBOX[0], HCM_BBOX[2]);
+    const lat = clamp(centerLat + jitterLat, HCM_BBOX[1], HCM_BBOX[3]);
+
+    const name = `${pick(namesA)} ${pick(namesB)}`;
+    const district = pick(districts);
+    const cat = pick(categories);
+    const price = pick(priceRanges);
+
+    out.push({
+      _id: `r-${i + 1}`,
+      name,
+      address: `Số ${Math.floor(Math.random() * 200) + 10} Đường Demo, ${district}`,
+      lat,
+      lon,
+      district,
+      category: cat,
+      priceRange: price,
+    });
+  }
+  return out;
+}
+
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+function clamp(v: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, v));
 }

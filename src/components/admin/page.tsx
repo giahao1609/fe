@@ -50,7 +50,7 @@ export default function AdminDashboardPage() {
       {/* ===== SIDEBAR ===== */}
       <aside className="w-64 bg-[#0d47a1] text-white flex flex-col shadow-lg">
         <div className="px-6 py-5 text-2xl font-bold tracking-wide border-b border-blue-700">
-          Duralux<span className="text-blue-200 ml-1">Admin</span>
+          Food<span className="text-blue-200 ml-1">Admin</span>
         </div>
 
         {/* NAVIGATION */}

@@ -1,10 +1,3 @@
-/**
- * Copyright(c) Live2D Inc. All rights reserved.
- *
- * Use of this source code is governed by the Live2D Open Software license
- * that can be found at https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html.
- */
-
 import { csmString } from '../type/csmstring';
 import { csmVector } from '../type/csmvector';
 import { CubismId } from './cubismid';
@@ -15,92 +8,66 @@ import { CubismId } from './cubismid';
  * ID名を管理する。
  */
 export class CubismIdManager {
-  /**
-   * コンストラクタ
-   */
+  /** コンストラクタ */
   public constructor() {
     this._ids = new csmVector<CubismId>();
   }
 
-  /**
-   * デストラクタ相当の処理
-   */
+  /** デストラクタ相当の処理 */
   public release(): void {
-    for (let i = 0; i < this._ids.getSize(); ++i) {
-      this._ids.set(i, void 0);
+    // ❌ this._ids.set(i, void 0) は型違反
+    // ❌ this._ids = null も型違反
+    // ✅ ベクタをリセット（空のインスタンスへ置き換え）
+    if (this._ids) {
+      // もし csmVector に clear() があれば:
+      // (this._ids as any).clear?.();
+      // 無い場合は新しいインスタンスを割り当て:
+      this._ids = new csmVector<CubismId>();
     }
-    this._ids = null;
   }
 
-  /**
-   * ID名をリストから登録
-   *
-   * @param ids ID名リスト
-   * @param count IDの個数
-   */
-  public registerIds(ids: string[] | csmString[]): void {
+  /** ID名をリストから登録 */
+  public registerIds(ids: Array<string | csmString>): void {
     for (let i = 0; i < ids.length; i++) {
       this.registerId(ids[i]);
     }
   }
 
-  /**
-   * ID名を登録
-   *
-   * @param id ID名
-   */
+  /** ID名を登録 */
   public registerId(id: string | csmString): CubismId {
-    let result: CubismId = null;
+    // 入力値を string に正規化
+    const key = typeof id === 'string' ? id : id.s;
 
-    if ('string' == typeof id) {
-      if ((result = this.findId(id)) != null) {
-        return result;
-      }
+    const existing = this.findId(key);
+    if (existing) return existing;
 
-      result = CubismId.createIdInternal(id);
-      this._ids.pushBack(result);
-    } else {
-      return this.registerId(id.s);
-    }
-
-    return result;
+    const created = CubismId.createIdInternal(key);
+    this._ids.pushBack(created);
+    return created;
   }
 
-  /**
-   * ID名からIDを取得する
-   *
-   * @param id ID名
-   */
+  /** ID名からIDを取得する */
   public getId(id: csmString | string): CubismId {
     return this.registerId(id);
   }
 
-  /**
-   * ID名からIDの確認
-   *
-   * @return true 存在する
-   * @return false 存在しない
-   */
+  /** ID名からIDの確認 */
   public isExist(id: csmString | string): boolean {
-    if ('string' == typeof id) {
-      return this.findId(id) != null;
-    }
-    return this.isExist(id.s);
+    const key = typeof id === 'string' ? id : id.s;
+    return this.findId(key) != null;
   }
 
   /**
    * ID名からIDを検索する。
-   *
-   * @param id ID名
-   * @return 登録されているID。なければNULL。
+   * @return 登録されているID。なければ null。
    */
-  private findId(id: string): CubismId {
+  private findId(id: string): CubismId | null {
     for (let i = 0; i < this._ids.getSize(); ++i) {
-      if (this._ids.at(i).getString().isEqual(id)) {
-        return this._ids.at(i);
+      const item = this._ids.at(i);
+      if (item && item.getString().isEqual(id)) {
+        return item;
       }
     }
-
     return null;
   }
 

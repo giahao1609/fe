@@ -57,24 +57,8 @@ export default function RestaurantHeader({ restaurant, getImageUrl }: Props) {
         </div>
       </div>
 
-      {/* 🧾 Hộp thông tin chi tiết nằm tách bên dưới ảnh */}
       <div className="relative z-10 bg-white shadow-md rounded-xl p-6 -mt-10 max-w-4xl mx-auto">
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">
-          {restaurant.name}
-        </h2>
-        <p className="text-gray-600">
-          {restaurant.address}
-          {restaurant.district ? `, ${restaurant.district}` : ""}
-        </p>
-        <p className="text-gray-500 text-sm mt-1">
-          {restaurant.category && `Loại hình: ${restaurant.category}`}{" "}
-          {restaurant.priceRange && ` • ${restaurant.priceRange}`}
-        </p>
-        {restaurant.scheduleText && (
-          <p className="text-gray-500 text-sm mt-1">
-            Giờ mở cửa: {restaurant.scheduleText}
-          </p>
-        )}
+       
       </div>
     </div>
   );

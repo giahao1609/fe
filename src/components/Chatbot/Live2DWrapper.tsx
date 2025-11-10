@@ -3,14 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useLive2D } from "./useLive2D";
 
-// tránh double-init giữa nhiều widget (nếu có)
 let __booted = false;
 
 export default function Live2DWrapper() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  // dùng id cố định; hook đã xử lý init-safe
   const { ready } = useLive2D("live2dCanvas", containerRef);
 
   useEffect(() => {
@@ -23,7 +21,6 @@ export default function Live2DWrapper() {
       ref={containerRef}
       className="relative h-full w-full overflow-hidden rounded-2xl bg-transparent"
     >
-      {/* canvas do hook gắn vào */}
       {!mounted && (
         <div className="absolute inset-0 animate-pulse rounded-2xl bg-transparent ring-1 ring-black/5" />
       )}

@@ -9,7 +9,11 @@ import RestaurantListTab from "@/components/admin/restaurants/RestaurantListTab"
 import RestaurantFormTab from "@/components/admin/restaurants/RestaurantFormTab";
 import FilesTab from "@/components/admin/chatbot/FilesTab";
 import HistoryTab from "@/components/admin/chatbot/HistoryTab";
-import AdminUploadPage from "@/components/admin/upload/page";
+
+// 👇 mới:
+import BlogListTab from "@/components/admin/blog/BlogListTab";
+import BlogFormTab from "@/components/admin/blog/BlogFormTab";
+import CommentModerationTab from "@/components/admin/blog/CommentModerationTab";
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<
@@ -19,13 +23,16 @@ export default function AdminPage() {
     | "chatbot-files"
     | "chatbot-history"
     | "upload-images"
+    // 👇 thêm:
+    | "blog-list"
+    | "blog-form"
+    | "comments"
   >("dashboard");
 
   const [openDropdown, setOpenDropdown] = useState<
-    "restaurants" | "chatbot" | "media" | null
+    "restaurants" | "chatbot" | "media" | "blog" | null
   >(null);
 
-  //  Thêm state lưu quán đang sửa
   const [editing, setEditing] = useState<any | null>(null);
 
   return (
@@ -43,32 +50,35 @@ export default function AdminPage() {
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
           {activeTab === "dashboard" && <DashboardContent />}
 
-          {/*  Danh sách quán */}
           {activeTab === "restaurants-list" && (
             <RestaurantListTab
               onEdit={(restaurant) => {
-                console.log(" Click sửa:", restaurant);
-                setEditing(restaurant); // lưu data quán đang sửa
-                setActiveTab("restaurants-form"); // chuyển sang tab form
+                setEditing(restaurant);
+                setActiveTab("restaurants-form");
               }}
             />
           )}
 
-          {/*  Form thêm/sửa quán */}
           {activeTab === "restaurants-form" && (
             <RestaurantFormTab
-              editing={editing} 
+              editing={editing}
               onDone={() => {
-                console.log("Lưu thành công quay lại danh sách");
                 setEditing(null);
                 setActiveTab("restaurants-list");
               }}
             />
           )}
 
+          {/* Chatbot */}
           {activeTab === "chatbot-files" && <FilesTab />}
           {activeTab === "chatbot-history" && <HistoryTab />}
-          {activeTab === "upload-images" && <AdminUploadPage />}
+
+          {/* Blog */}
+          {activeTab === "blog-list" && <BlogListTab />}
+          {activeTab === "blog-form" && <BlogFormTab />}
+
+          {/* Comments moderation */}
+          {activeTab === "comments" && <CommentModerationTab />}
         </main>
       </div>
     </div>

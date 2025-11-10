@@ -6,6 +6,7 @@
  */
 
 import { CubismIdHandle } from '../id/cubismid';
+import { CubismFramework } from '../live2dcubismframework';
 import { CubismModel } from '../model/cubismmodel';
 import { csmVector } from '../type/csmvector';
 
@@ -24,12 +25,14 @@ export class CubismBreath {
 
   /**
    * インスタンスの破棄
-   * @param instance 対象のCubismBreath
+   * @param _instance 対象のCubismBreath
+   *
+   * 備考:
+   *  - TS では引数に null を再代入できないため、ここでは no-op にする。
+   *  - 必要なら呼び出し側で参照を undefined/null にすること。
    */
-  public static delete(instance: CubismBreath): void {
-    if (instance != null) {
-      instance = null;
-    }
+  public static delete(_instance: CubismBreath | null | undefined): void {
+    // no-op for GC languages; caller can drop the reference.
   }
 
   /**
@@ -58,26 +61,30 @@ export class CubismBreath {
 
     const t: number = this._currentTime * 2.0 * Math.PI;
 
-    for (let i = 0; i < this._breathParameters.getSize(); ++i) {
-      const data: BreathParameterData = this._breathParameters.at(i);
+    // guard: まだ setParameters されていない場合でも安全に動作
+    const params = this._breathParameters;
+    const size = params.getSize();
 
+    for (let i = 0; i < size; ++i) {
+      const data: BreathParameterData = params.at(i);
+      // parameterId は常に non-null（ctor で空IDにフォールバック）
       model.addParameterValueById(
         data.parameterId,
-        data.offset + data.peak * Math.sin(t / data.cycle),
+        data.offset + data.peak * Math.sin(t / Math.max(data.cycle, 1e-6)),
         data.weight
       );
     }
   }
 
-  /**
-   * コンストラクタ
-   */
+  /** コンストラクタ */
   public constructor() {
     this._currentTime = 0.0;
+    // デフォルトで空のベクタを持っておく（null/undefined を避ける）
+    this._breathParameters = new csmVector<BreathParameterData>();
   }
 
-  _breathParameters: csmVector<BreathParameterData>; // 呼吸にひもづいているパラメータのリスト
-  _currentTime: number; // 積算時間[秒]
+  private _breathParameters: csmVector<BreathParameterData>; // 呼吸にひもづいているパラメータのリスト
+  private _currentTime: number; // 積算時間[秒]
 }
 
 /**
@@ -99,18 +106,22 @@ export class BreathParameterData {
     cycle?: number,
     weight?: number
   ) {
-    this.parameterId = parameterId == undefined ? null : parameterId;
-    this.offset = offset == undefined ? 0.0 : offset;
-    this.peak = peak == undefined ? 0.0 : peak;
-    this.cycle = cycle == undefined ? 0.0 : cycle;
-    this.weight = weight == undefined ? 0.0 : weight;
+    // TS strict: parameterId は non-nullable。未指定時は空IDへフォールバック。
+    this.parameterId =
+      parameterId ??
+      CubismFramework.getIdManager().getId(''); // safe empty id
+
+    this.offset = offset ?? 0.0;
+    this.peak = peak ?? 0.0;
+    this.cycle = cycle ?? 4.0; // 既定周期を 4 秒程度に
+    this.weight = weight ?? 1.0;
   }
 
-  parameterId: CubismIdHandle; // 呼吸をひもづけるパラメータID\
-  offset: number; // 呼吸を正弦波としたときの、波のオフセット
-  peak: number; // 呼吸を正弦波としたときの、波の高さ
-  cycle: number; // 呼吸を正弦波としたときの、波の周期
-  weight: number; // パラメータへの重み
+  public parameterId: CubismIdHandle; // 呼吸をひもづけるパラメータID
+  public offset: number; // 呼吸を正弦波としたときの、波のオフセット
+  public peak: number; // 呼吸を正弦波としたときの、波の高さ
+  public cycle: number; // 呼吸を正弦波としたときの、波の周期
+  public weight: number; // パラメータへの重み
 }
 
 // Namespace definition for compatibility.
