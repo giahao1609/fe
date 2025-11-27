@@ -3,6 +3,7 @@ import Script from "next/script";
 import type { ReactNode } from "react";
 import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/context/AuthContext";
+import { Toaster } from "sonner"; // 👈 THÊM DÒNG NÀY
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -99,11 +100,8 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  verification: {
-   
-  },
+  verification: {},
 };
-
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
@@ -124,6 +122,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-screen bg-white text-gray-900 antialiased flex flex-col [--sat:env(safe-area-inset-top)] [--sab:env(safe-area-inset-bottom)]">
         <AuthProvider>
           {children}
+
+          <Toaster
+            position="top-right"
+            richColors
+            closeButton
+            toastOptions={{
+              duration: 3000,
+              classNames: {
+                toast: "rounded-xl shadow-lg border border-gray-100",
+              },
+            }}
+          />
         </AuthProvider>
 
         <div className="h-[var(--sab)]" aria-hidden />

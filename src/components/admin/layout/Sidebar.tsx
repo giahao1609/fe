@@ -3,24 +3,42 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import React, { Dispatch, SetStateAction } from "react";
 
-type TabType =
+export type TabType =
   | "dashboard"
   | "restaurants-list"
   | "restaurants-form"
   | "chatbot-files"
   | "chatbot-history"
   | "upload-images"
-  // 👇 thêm mới:
   | "blog-list"
   | "blog-form"
-  | "comments";
+  | "comments"
+  | "users-list"
+  // 👇 thêm 2 tab mới cho Category
+  | "categories-list"
+  | "categories-form";
 
 interface SidebarProps {
   activeTab: TabType;
   setActiveTab: Dispatch<SetStateAction<TabType>>;
-  openDropdown: "restaurants" | "chatbot" | "media" | "blog" | null; // 👈 thêm 'blog'
+  openDropdown:
+    | "restaurants"
+    | "chatbot"
+    | "media"
+    | "blog"
+    | "users"
+    | "categories"
+    | null;
   setOpenDropdown: Dispatch<
-    SetStateAction<"restaurants" | "chatbot" | "media" | "blog" | null>
+    SetStateAction<
+      | "restaurants"
+      | "chatbot"
+      | "media"
+      | "blog"
+      | "users"
+      | "categories"
+      | null
+    >
   >;
 }
 
@@ -31,7 +49,13 @@ export default function Sidebar({
   setOpenDropdown,
 }: SidebarProps) {
   const toggleDropdown = (
-    menu: "restaurants" | "chatbot" | "media" | "blog"
+    menu:
+      | "restaurants"
+      | "chatbot"
+      | "media"
+      | "blog"
+      | "users"
+      | "categories"
   ) => {
     setOpenDropdown(openDropdown === menu ? null : menu);
   };
@@ -53,7 +77,7 @@ export default function Sidebar({
 
         {/* RESTAURANTS */}
         <DropdownGroup
-          label="Restaurants"
+          label="Nhà hàng"
           icon={<i className="fa-solid fa-utensils"></i>}
           isOpen={openDropdown === "restaurants"}
           onToggle={() => toggleDropdown("restaurants")}
@@ -67,6 +91,38 @@ export default function Sidebar({
             label="➕ Thêm / Sửa Nhà hàng"
             active={activeTab === "restaurants-form"}
             onClick={() => setActiveTab("restaurants-form")}
+          />
+        </DropdownGroup>
+
+        <DropdownGroup
+          label="Danh mục món"
+          icon={<i className="fa-solid fa-layer-group"></i>}
+          isOpen={openDropdown === "categories"}
+          onToggle={() => toggleDropdown("categories")}
+        >
+          <SubNavButton
+            label="📚 Danh sách Category"
+            active={activeTab === "categories-list"}
+            onClick={() => setActiveTab("categories-list")}
+          />
+          <SubNavButton
+            label="➕ Thêm / Sửa Category"
+            active={activeTab === "categories-form"}
+            onClick={() => setActiveTab("categories-form")}
+          />
+        </DropdownGroup>
+
+        {/* USERS */}
+        <DropdownGroup
+          label="Người dùng"
+          icon={<i className="fa-regular fa-user"></i>}
+          isOpen={openDropdown === "users"}
+          onToggle={() => toggleDropdown("users")}
+        >
+          <SubNavButton
+            label="👥 Danh sách người dùng"
+            active={activeTab === "users-list"}
+            onClick={() => setActiveTab("users-list")}
           />
         </DropdownGroup>
 

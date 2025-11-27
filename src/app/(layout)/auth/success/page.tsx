@@ -11,7 +11,7 @@ export default function AuthSuccessPage() {
       if (!token) return window.location.replace("/auth");
       try {
         await login(token);
-        window.location.replace("/"); // chuyển hướng ngay lập tức
+        window.location.replace("/");
       } catch (e) {
         console.error("login error:", e);
         window.location.replace("/auth");

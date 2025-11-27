@@ -20,7 +20,6 @@ const calcReadingTime = (content: string[]) => {
 };
   return (
     <div className="relative">
-      {/* HERO */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-rose-50 to-white" />
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 lg:py-14">

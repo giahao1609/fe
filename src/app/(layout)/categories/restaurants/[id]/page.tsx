@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import axios from "axios";
@@ -11,221 +11,269 @@ import RestaurantGallery from "@/components/restaurant/RestaurantGallery";
 import RestaurantReviews from "@/components/restaurant/RestaurantReviews";
 import RestaurantLightbox from "@/components/restaurant/RestaurantLightbox";
 
-import { mockRestaurants } from "@/data/mock-restaurants";
-import { mockReviews } from "@/data/mock-reviews";
+import {
+  RestaurantService,
+  type Restaurant,
+} from "@/services/restaurant.service";
+import {
+  MenuService,
+  type MenuItem,
+} from "@/services/menu.service";
 
-// ========= helpers =========
-const slugify = (s: string) =>
-  (s || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "")
-    .trim();
+/** helper: hiện tại backend detail đã trả sẵn signed URL
+ *  nên hàm này chủ yếu để phòng hờ, nếu sau này có path "thô"
+ */
+const getImageUrl = (path?: string | null) => {
+  if (!path) return "";
+  const p = path.toString().trim();
+  if (!p) return "";
+  // đã là URL tuyệt đối
+  if (/^https?:\/\//i.test(p)) return p;
+  // fallback (nếu backend trả key GCS thì lúc khác xử lý thêm)
+  return p;
+};
 
 export default function RestaurantDetailPage() {
-  const { id: idOrSlug } = useParams<{ id: string }>();
-
+  const { id } = useParams<{ id: string }>();
   const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
-  const GCS_URL = process.env.NEXT_PUBLIC_GCS_URL || ""; // vd: https://storage.googleapis.com/foodmap-secure
-  const USE_FAKE = process.env.NEXT_PUBLIC_USE_FAKE_DATA === "1";
 
-  const [restaurant, setRestaurant] = useState<any>(null);
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
-  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  const [loadingRestaurant, setLoadingRestaurant] = useState(true);
+  const [loadingMenu, setLoadingMenu] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [menuError, setMenuError] = useState<string | null>(null);
 
-  // Chế độ fake: tìm theo _id hoặc slug từ tên
-  const fakeRestaurant = useMemo(() => {
-    if (!USE_FAKE) return null;
-    const foundById = mockRestaurants.find((r) => r._id === idOrSlug);
-    if (foundById) return foundById;
-
-    const foundBySlug = mockRestaurants.find((r) => slugify(r.name) === idOrSlug);
-    return foundBySlug || null;
-  }, [USE_FAKE, idOrSlug]);
-
-  const fakeReviewsForRestaurant = useMemo(() => {
-    if (!USE_FAKE || !fakeRestaurant) return [];
-    return (mockReviews || []).filter(
-      (rv) => rv.restaurantId === fakeRestaurant._id
-    );
-  }, [USE_FAKE, fakeRestaurant]);
-
-  // 1) Load dữ liệu restaurant + reviews
+  // ==== Load restaurant detail + menu + reviews ====
   useEffect(() => {
-    let mounted = true;
+    if (!id) return;
 
-    const load = async () => {
-      setLoading(true);
+    let cancelled = false;
+
+    const loadRestaurant = async () => {
+      setLoadingRestaurant(true);
       setError(null);
-
       try {
-        if (USE_FAKE) {
-          if (!fakeRestaurant) {
-            setRestaurant(null);
-            setReviews([]);
-          } else {
-            setRestaurant(fakeRestaurant);
-            setReviews(fakeReviewsForRestaurant);
-          }
-        } else {
-          // Backend thật: hỗ trợ id hoặc slug (backend của bạn cần hỗ trợ endpoint theo cách này)
-          const [r, rv] = await Promise.all([
-            axios.get(`${API_URL}/restaurants/${idOrSlug}`),
-            axios.get(`${API_URL}/review/restaurant/${idOrSlug}`),
-          ]);
+        // GET /owner/restaurants/detail/:id
+        const data = await RestaurantService.getRestaurantDetail(id);
+        if (!cancelled) setRestaurant(data);
+      } catch (e: any) {
+        console.error("[RestaurantDetail] load restaurant error:", e);
+        if (!cancelled) {
+          setError("Không thể tải thông tin nhà hàng.");
+          setRestaurant(null);
+        }
+      } finally {
+        if (!cancelled) setLoadingRestaurant(false);
+      }
+    };
 
-          // Tùy response thực tế (res.data hoặc res.data.data)
-          const dataRestaurant = r.data?.data ?? r.data;
-          const dataReviews = rv.data?.data ?? rv.data;
+    const loadMenu = async () => {
+      setLoadingMenu(true);
+      setMenuError(null);
+      try {
+        // GET /owner/restaurants/:id/menu-items (từ MenuService)
+        const res = await MenuService.listByRestaurant(id);
+        const list = Array.isArray(res) ? res : (res as any)?.items ?? [];
+        if (!cancelled) setMenuItems(list);
+      } catch (e: any) {
+        console.error("[RestaurantDetail] load menu error:", e);
+        if (!cancelled) {
+          setMenuError("Không thể tải thực đơn.");
+          setMenuItems([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingMenu(false);
+      }
+    };
 
-          setRestaurant(dataRestaurant || null);
+    const loadReviews = async () => {
+      if (!API_URL) return;
+      try {
+        const rv = await axios.get(`${API_URL}/review/restaurant/${id}`);
+        const dataReviews = rv.data?.data ?? rv.data;
+        if (!cancelled) {
           setReviews(Array.isArray(dataReviews) ? dataReviews : []);
         }
-      } catch (e: any) {
-        setError("Không thể tải dữ liệu quán ăn.");
-        setRestaurant(null);
-        setReviews([]);
-      } finally {
-        if (mounted) setLoading(false);
+      } catch (e) {
+        console.warn("[RestaurantDetail] load reviews error:", e);
+        if (!cancelled) setReviews([]);
       }
     };
 
-    if (idOrSlug) load();
+    loadRestaurant();
+    loadMenu();
+    loadReviews();
+
     return () => {
-      mounted = false;
+      cancelled = true;
     };
-  }, [idOrSlug, API_URL, USE_FAKE, fakeRestaurant, fakeReviewsForRestaurant]);
+  }, [id, API_URL]);
 
-  // 2) Làm mới signed URL cho ảnh private (chỉ khi KHÔNG fake)
-  useEffect(() => {
-    if (USE_FAKE) return; // bỏ qua khi fake
-    if (!restaurant && reviews.length === 0) return;
-
-    const refresh = async () => {
-      const urls: Record<string, string> = {};
-      const paths: string[] = [];
-
-      // Gom ảnh của quán
-      if (restaurant) {
-        const banners = Array.isArray(restaurant.banner)
-          ? restaurant.banner
-          : [restaurant.banner].filter(Boolean);
-
-        paths.push(
-          ...banners,
-          ...(restaurant.gallery || []),
-          ...(restaurant.menuImages || [])
-        );
-      }
-
-      // Gom ảnh review
-      for (const rv of reviews) {
-        if (Array.isArray(rv.images)) paths.push(...rv.images);
-        else if (rv.image) paths.push(rv.image);
-      }
-
-      // Refresh từng path nếu là key (không phải URL)
-      for (const path of paths) {
-        if (!path) continue;
-
-        // nếu đã là http(s) thì bỏ qua
-        if (/^https?:\/\//i.test(path)) continue;
-
-        // Nếu path có prefix GCS_URL → cắt thành key
-        let clean = path.trim();
-        if (GCS_URL && clean.startsWith(GCS_URL)) {
-          clean = clean.replace(`${GCS_URL}/`, "");
-        }
-
-        try {
-          const { data } = await axios.get(
-            `${API_URL}/restaurants/refresh-link/${encodeURIComponent(clean)}`
-          );
-          if (data?.url) urls[clean] = data.url;
-        } catch {
-          // im lặng để không phá UI
-        }
-      }
-
-      setSignedUrls(urls);
-    };
-
-    refresh();
-  }, [restaurant, reviews, API_URL, GCS_URL, USE_FAKE]);
-
-  // 3) Lấy URL ảnh: ưu tiên http/s, tiếp theo signed cache, cuối cùng ghép từ GCS_URL
-  const getImageUrl = (path?: string) => {
-    if (!path) return "";
-
-    const p = path.trim();
-    if (/^https?:\/\//i.test(p)) return p; // đã là URL tuyệt đối
-
-    // có signed URL sẵn
-    if (signedUrls[p]) return signedUrls[p];
-
-    // nếu dùng fake: coi banner luôn là URL; phòng hờ nếu ai đó truyền key
-    if (USE_FAKE) return p;
-
-    // GCS
-    if (GCS_URL) return `${GCS_URL}/${p}`;
-    return p; // fallback cuối
-  };
-
-  // 4) UI states
-  if (loading) {
+  // ==== State UI ====
+  if (loadingRestaurant) {
     return (
-      <div className="p-10 text-center text-gray-600" suppressHydrationWarning>
-        ⏳ Đang tải...
+      <div className="p-10 text-center text-gray-600">
+        ⏳ Đang tải thông tin nhà hàng...
       </div>
     );
   }
 
   if (error || !restaurant) {
     return (
-      <div className="p-10 text-center" suppressHydrationWarning>
-        {error || "Không thể tải thông tin quán ăn."}
-        <Link href="/categories/restaurants" className="text-blue-600 underline block mt-3">
+      <div className="p-10 text-center">
+        <p className="text-red-500 mb-3">
+          {error || "Không tìm thấy nhà hàng."}
+        </p>
+        <Link href="/categories/restaurants" className="text-blue-600 underline">
           ← Quay lại danh sách
         </Link>
       </div>
     );
   }
 
+  // Ưu tiên gallerySigned, fallback gallery thường
+  const galleryImages =
+    (restaurant.gallerySigned && restaurant.gallerySigned.length > 0
+      ? restaurant.gallerySigned
+      : restaurant.gallery) ?? [];
+
   return (
     <div className="bg-gray-50 min-h-screen">
+      {/* Banner + overlay */}
       <RestaurantHeader restaurant={restaurant} getImageUrl={getImageUrl} />
 
+      {/* Card info dưới banner */}
       <RestaurantInfo restaurant={restaurant} />
 
       <div className="max-w-5xl mx-auto mt-8 space-y-8 p-4">
-        {/* Giới thiệu */}
-        {restaurant.description && (
+        {/* Giới thiệu (lấy từ metaDescription nếu có) */}
+        {(restaurant.metaDescription || restaurant.metaTitle) && (
           <section className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-xl font-semibold mb-3 border-b pb-2">Giới thiệu</h2>
-            <p className="text-gray-700 whitespace-pre-line">{restaurant.description}</p>
+            <h2 className="text-xl font-semibold mb-3 border-b pb-2">
+              Giới thiệu
+            </h2>
+            {restaurant.metaTitle && (
+              <p className="text-base font-semibold text-gray-900 mb-1">
+                {restaurant.metaTitle}
+              </p>
+            )}
+            {restaurant.metaDescription && (
+              <p className="text-gray-700 whitespace-pre-line">
+                {restaurant.metaDescription}
+              </p>
+            )}
+            {!restaurant.metaTitle && !restaurant.metaDescription && (
+              <p className="text-gray-500 text-sm">
+                Nhà hàng chưa có nội dung giới thiệu chi tiết.
+              </p>
+            )}
           </section>
         )}
 
-        {/* Bộ sưu tập ảnh */}
-        {Array.isArray(restaurant.gallery) && restaurant.gallery.length > 0 && (
+        {/* Thực đơn (menu items) */}
+        <section className="bg-white rounded-xl shadow p-6">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="text-xl font-semibold border-b pb-2 flex-1">
+              Thực đơn
+            </h2>
+            {loadingMenu && (
+              <span className="text-xs text-gray-500">Đang tải...</span>
+            )}
+          </div>
+
+          {menuError && (
+            <p className="text-sm text-red-500 mb-2">{menuError}</p>
+          )}
+
+          {!loadingMenu && menuItems.length === 0 && !menuError && (
+            <p className="text-sm text-gray-500">
+              Nhà hàng chưa có món nào trong hệ thống.
+            </p>
+          )}
+
+          {!loadingMenu && menuItems.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {menuItems.map((item) => {
+                const rawImg =
+                  (item as any).imagesSigned?.[0] ??
+                  (item as any).images?.[0];
+
+                const price =
+                  item.basePrice?.amount != null
+                    ? `${item.basePrice.amount.toLocaleString("vi-VN")} ${
+                        item.basePrice.currency || "VND"
+                      }`
+                    : "-";
+
+                return (
+                  <div
+                    key={item._id}
+                    className="flex gap-3 rounded-lg border border-gray-100 p-3 shadow-sm hover:shadow-md transition"
+                  >
+                    {rawImg && (
+                      <div className="relative h-20 w-20 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={getImageUrl(rawImg)}
+                          alt={item.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="font-semibold text-gray-900 text-sm">
+                          {item.name}
+                        </h3>
+                        <span className="text-xs font-mono text-gray-700">
+                          {price}
+                        </span>
+                      </div>
+
+                      {item.description && (
+                        <p className="mt-1 text-xs text-gray-600 line-clamp-2">
+                          {item.description}
+                        </p>
+                      )}
+
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {item.itemType && (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-700">
+                            {item.itemType}
+                          </span>
+                        )}
+                        {item.isAvailable === false && (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500">
+                            Tạm ngưng
+                          </span>
+                        )}
+                        {Array.isArray(item.tags) &&
+                          item.tags.slice(0, 3).map((tag) => (
+                            <span
+                              key={tag}
+                              className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] text-rose-700"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Bộ sưu tập ảnh (lấy gallerySigned) */}
+        {galleryImages.length > 0 && (
           <RestaurantGallery
             title="Hình ảnh quán"
-            images={restaurant.gallery}
-            getImageUrl={getImageUrl}
-            onPreview={setPreviewImage}
-          />
-        )}
-
-        {/* Ảnh menu */}
-        {Array.isArray(restaurant.menuImages) && restaurant.menuImages.length > 0 && (
-          <RestaurantGallery
-            title="Thực đơn"
-            images={restaurant.menuImages}
+            images={galleryImages}
             getImageUrl={getImageUrl}
             onPreview={setPreviewImage}
           />
@@ -233,13 +281,11 @@ export default function RestaurantDetailPage() {
 
         {/* Review */}
         <RestaurantReviews
-          id={typeof restaurant._id === "string" ? restaurant._id : String(restaurant._id)}
+          id={restaurant._id}
           API_URL={API_URL}
           reviews={reviews}
           setReviews={setReviews}
           getImageUrl={getImageUrl}
-          // Nếu bạn cần chặn gửi review khi fake thì có thể truyền cờ xuống component
-          // isReadOnly={USE_FAKE}
         />
       </div>
 
