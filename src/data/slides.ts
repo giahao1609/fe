@@ -1,3 +1,4 @@
+// data/slides.ts
 import type { Slide } from "@/components/common/BannerSlider";
 
 export const slides: Slide[] = [
@@ -7,7 +8,8 @@ export const slides: Slide[] = [
     subtitle: "Áp dụng tại 12 chi nhánh trong tháng này",
     ctaText: "Đặt bàn ngay",
     ctaHref: "/categories/deals",
-    image: "/image/slider/slide-1.jpg",
+    image:
+      "https://images.unsplash.com/photo-1543353071-10c8ba85a904?auto=format&fit=crop&w=1600&q=80",
     align: "left",
   },
   {
@@ -16,7 +18,8 @@ export const slides: Slide[] = [
     subtitle: "Ưu đãi áp dụng hôm nay",
     ctaText: "Khám phá quán",
     ctaHref: "/categories/nearby",
-    image: "/image/slider/slide-2.jpg",
+    image:
+      "https://images.unsplash.com/photo-1504754524776-8f4f37790ca0?auto=format&fit=crop&w=1600&q=80",
     align: "center",
   },
   {
@@ -25,7 +28,8 @@ export const slides: Slide[] = [
     subtitle: "Món Việt, Nhật, Hàn đa dạng",
     ctaText: "Xem menu",
     ctaHref: "/categories/restaurants",
-    image: "/image/slider/slide-3.jpg",
+    image:
+      "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1600&q=80",
     align: "right",
   },
 ];

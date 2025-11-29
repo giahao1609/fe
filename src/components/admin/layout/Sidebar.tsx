@@ -3,19 +3,43 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import React, { Dispatch, SetStateAction } from "react";
 
-type TabType =
+export type TabType =
   | "dashboard"
   | "restaurants-list"
   | "restaurants-form"
   | "chatbot-files"
   | "chatbot-history"
-  | "upload-images";
+  | "upload-images"
+  | "blog-list"
+  | "blog-form"
+  | "comments"
+  | "users-list"
+  // 👇 thêm 2 tab mới cho Category
+  | "categories-list"
+  | "categories-form";
 
 interface SidebarProps {
   activeTab: TabType;
   setActiveTab: Dispatch<SetStateAction<TabType>>;
-  openDropdown: "restaurants" | "chatbot" | "media" | null;
-  setOpenDropdown: Dispatch<SetStateAction<"restaurants" | "chatbot" | "media" | null>>;
+  openDropdown:
+    | "restaurants"
+    | "chatbot"
+    | "media"
+    | "blog"
+    | "users"
+    | "categories"
+    | null;
+  setOpenDropdown: Dispatch<
+    SetStateAction<
+      | "restaurants"
+      | "chatbot"
+      | "media"
+      | "blog"
+      | "users"
+      | "categories"
+      | null
+    >
+  >;
 }
 
 export default function Sidebar({
@@ -24,18 +48,24 @@ export default function Sidebar({
   openDropdown,
   setOpenDropdown,
 }: SidebarProps) {
-  const toggleDropdown = (menu: "restaurants" | "chatbot" | "media") => {
+  const toggleDropdown = (
+    menu:
+      | "restaurants"
+      | "chatbot"
+      | "media"
+      | "blog"
+      | "users"
+      | "categories"
+  ) => {
     setOpenDropdown(openDropdown === menu ? null : menu);
   };
 
   return (
     <aside className="w-64 bg-[#0d47a1] text-white flex flex-col shadow-lg">
-      {/* LOGO */}
       <div className="px-6 py-5 text-2xl font-bold tracking-wide border-b border-blue-700">
-        Duralux<span className="text-blue-200 ml-1">Admin</span>
+        Food<span className="text-blue-200 ml-1">Admin</span>
       </div>
 
-      {/* NAVIGATION */}
       <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto text-sm">
         {/* DASHBOARD */}
         <NavButton
@@ -47,7 +77,7 @@ export default function Sidebar({
 
         {/* RESTAURANTS */}
         <DropdownGroup
-          label="Restaurants"
+          label="Nhà hàng"
           icon={<i className="fa-solid fa-utensils"></i>}
           isOpen={openDropdown === "restaurants"}
           onToggle={() => toggleDropdown("restaurants")}
@@ -63,6 +93,65 @@ export default function Sidebar({
             onClick={() => setActiveTab("restaurants-form")}
           />
         </DropdownGroup>
+
+        <DropdownGroup
+          label="Danh mục món"
+          icon={<i className="fa-solid fa-layer-group"></i>}
+          isOpen={openDropdown === "categories"}
+          onToggle={() => toggleDropdown("categories")}
+        >
+          <SubNavButton
+            label="📚 Danh sách Category"
+            active={activeTab === "categories-list"}
+            onClick={() => setActiveTab("categories-list")}
+          />
+          <SubNavButton
+            label="➕ Thêm / Sửa Category"
+            active={activeTab === "categories-form"}
+            onClick={() => setActiveTab("categories-form")}
+          />
+        </DropdownGroup>
+
+        {/* USERS */}
+        <DropdownGroup
+          label="Người dùng"
+          icon={<i className="fa-regular fa-user"></i>}
+          isOpen={openDropdown === "users"}
+          onToggle={() => toggleDropdown("users")}
+        >
+          <SubNavButton
+            label="👥 Danh sách người dùng"
+            active={activeTab === "users-list"}
+            onClick={() => setActiveTab("users-list")}
+          />
+        </DropdownGroup>
+
+        {/* BLOG */}
+        <DropdownGroup
+          label="Blog"
+          icon={<i className="fa-regular fa-newspaper"></i>}
+          isOpen={openDropdown === "blog"}
+          onToggle={() => toggleDropdown("blog")}
+        >
+          <SubNavButton
+            label="📝 Danh sách bài viết"
+            active={activeTab === "blog-list"}
+            onClick={() => setActiveTab("blog-list")}
+          />
+          <SubNavButton
+            label="➕ Thêm / Sửa bài viết"
+            active={activeTab === "blog-form"}
+            onClick={() => setActiveTab("blog-form")}
+          />
+        </DropdownGroup>
+
+        {/* COMMENTS moderation */}
+        <NavButton
+          icon={<i className="fa-regular fa-comments"></i>}
+          label="Duyệt bình luận"
+          active={activeTab === "comments"}
+          onClick={() => setActiveTab("comments")}
+        />
 
         {/* CHATBOT */}
         <DropdownGroup
@@ -105,15 +194,13 @@ export default function Sidebar({
         />
       </nav>
 
-      {/* FOOTER */}
       <div className="p-4 text-xs text-blue-100 border-t border-blue-800">
-        © 2025 Duralux CRM
+        © 2025
       </div>
     </aside>
   );
 }
 
-/* ==== COMPONENTS ==== */
 function NavButton({
   icon,
   label,
@@ -170,7 +257,9 @@ function DropdownGroup({
         {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
 
-      {isOpen && <div className="ml-9 mt-1 space-y-1 animate-fadeIn">{children}</div>}
+      {isOpen && (
+        <div className="ml-9 mt-1 space-y-1 animate-fadeIn">{children}</div>
+      )}
     </div>
   );
 }

@@ -18,62 +18,43 @@ import { csmVector } from '../type/csmvector';
 export class CubismEyeBlink {
   /**
    * インスタンスを作成する
-   * @param modelSetting モデルの設定情報
+   * @param modelSetting モデルの設定情報（省略可）
    * @return 作成されたインスタンス
-   * @note 引数がNULLの場合、パラメータIDが設定されていない空のインスタンスを作成する。
+   * @note 引数未指定の場合、パラメータIDが空のインスタンスを作成する。
    */
-  public static create(
-    modelSetting: ICubismModelSetting = null
-  ): CubismEyeBlink {
+  public static create(modelSetting?: ICubismModelSetting): CubismEyeBlink {
     return new CubismEyeBlink(modelSetting);
   }
 
   /**
    * インスタンスの破棄
-   * @param eyeBlink 対象のCubismEyeBlink
+   * @param _eyeBlink 対象のCubismEyeBlink
+   *
+   * 備考: TypeScript では参照に null を再代入できないため no-op。
+   *       呼び出し側で参照を破棄すれば GC が回収する。
    */
-  public static delete(eyeBlink: CubismEyeBlink): void {
-    if (eyeBlink != null) {
-      eyeBlink = null;
-    }
+  public static delete(_eyeBlink?: CubismEyeBlink | null): void {
+    // no-op
   }
 
-  /**
-   * まばたきの間隔の設定
-   * @param blinkingInterval まばたきの間隔の時間[秒]
-   */
+  /** まばたきの間隔の設定（秒） */
   public setBlinkingInterval(blinkingInterval: number): void {
     this._blinkingIntervalSeconds = blinkingInterval;
   }
 
-  /**
-   * まばたきのモーションの詳細設定
-   * @param closing   まぶたを閉じる動作の所要時間[秒]
-   * @param closed    まぶたを閉じている動作の所要時間[秒]
-   * @param opening   まぶたを開く動作の所要時間[秒]
-   */
-  public setBlinkingSetting(
-    closing: number,
-    closed: number,
-    opening: number
-  ): void {
+  /** まばたきモーションの詳細設定（秒） */
+  public setBlinkingSetting(closing: number, closed: number, opening: number): void {
     this._closingSeconds = closing;
     this._closedSeconds = closed;
     this._openingSeconds = opening;
   }
 
-  /**
-   * まばたきさせるパラメータIDのリストの設定
-   * @param parameterIds パラメータのIDのリスト
-   */
+  /** まばたきさせるパラメータIDのリストの設定 */
   public setParameterIds(parameterIds: csmVector<CubismIdHandle>): void {
     this._parameterIds = parameterIds;
   }
 
-  /**
-   * まばたきさせるパラメータIDのリストの取得
-   * @return パラメータIDのリスト
-   */
+  /** まばたきさせるパラメータIDのリストの取得 */
   public getParameterIds(): csmVector<CubismIdHandle> {
     return this._parameterIds;
   }
@@ -85,84 +66,73 @@ export class CubismEyeBlink {
    */
   public updateParameters(model: CubismModel, deltaTimeSeconds: number): void {
     this._userTimeSeconds += deltaTimeSeconds;
-    let parameterValue: number;
+
+    let parameterValue = 1.0;
     let t = 0.0;
-    const blinkingState: EyeState = this._blinkingState;
 
-    switch (blinkingState) {
-      case EyeState.EyeState_Closing:
-        t =
-          (this._userTimeSeconds - this._stateStartTimeSeconds) /
-          this._closingSeconds;
-
+    switch (this._blinkingState) {
+      case EyeState.EyeState_Closing: {
+        t = (this._userTimeSeconds - this._stateStartTimeSeconds) / this._closingSeconds;
         if (t >= 1.0) {
           t = 1.0;
           this._blinkingState = EyeState.EyeState_Closed;
           this._stateStartTimeSeconds = this._userTimeSeconds;
         }
-
         parameterValue = 1.0 - t;
-
         break;
-      case EyeState.EyeState_Closed:
-        t =
-          (this._userTimeSeconds - this._stateStartTimeSeconds) /
-          this._closedSeconds;
+      }
 
+      case EyeState.EyeState_Closed: {
+        t = (this._userTimeSeconds - this._stateStartTimeSeconds) / this._closedSeconds;
         if (t >= 1.0) {
           this._blinkingState = EyeState.EyeState_Opening;
           this._stateStartTimeSeconds = this._userTimeSeconds;
         }
-
         parameterValue = 0.0;
-
         break;
-      case EyeState.EyeState_Opening:
-        t =
-          (this._userTimeSeconds - this._stateStartTimeSeconds) /
-          this._openingSeconds;
+      }
 
+      case EyeState.EyeState_Opening: {
+        t = (this._userTimeSeconds - this._stateStartTimeSeconds) / this._openingSeconds;
         if (t >= 1.0) {
           t = 1.0;
           this._blinkingState = EyeState.EyeState_Interval;
           this._nextBlinkingTime = this.determinNextBlinkingTiming();
         }
-
         parameterValue = t;
-
         break;
-      case EyeState.EyeState_Interval:
+      }
+
+      case EyeState.EyeState_Interval: {
         if (this._nextBlinkingTime < this._userTimeSeconds) {
           this._blinkingState = EyeState.EyeState_Closing;
           this._stateStartTimeSeconds = this._userTimeSeconds;
         }
-
         parameterValue = 1.0;
-
         break;
+      }
+
       case EyeState.EyeState_First:
-      default:
+      default: {
         this._blinkingState = EyeState.EyeState_Interval;
         this._nextBlinkingTime = this.determinNextBlinkingTiming();
-
         parameterValue = 1.0;
         break;
+      }
     }
 
     if (!CubismEyeBlink.CloseIfZero) {
       parameterValue = -parameterValue;
     }
 
-    for (let i = 0; i < this._parameterIds.getSize(); ++i) {
+    const size = this._parameterIds.getSize();
+    for (let i = 0; i < size; ++i) {
       model.setParameterValueById(this._parameterIds.at(i), parameterValue);
     }
   }
 
-  /**
-   * コンストラクタ
-   * @param modelSetting モデルの設定情報
-   */
-  public constructor(modelSetting: ICubismModelSetting) {
+  /** コンストラクタ */
+  public constructor(modelSetting?: ICubismModelSetting) {
     this._blinkingState = EyeState.EyeState_First;
     this._nextBlinkingTime = 0.0;
     this._stateStartTimeSeconds = 0.0;
@@ -173,36 +143,32 @@ export class CubismEyeBlink {
     this._userTimeSeconds = 0.0;
     this._parameterIds = new csmVector<CubismIdHandle>();
 
-    if (modelSetting == null) {
-      return;
-    }
-
-    for (let i = 0; i < modelSetting.getEyeBlinkParameterCount(); ++i) {
-      this._parameterIds.pushBack(modelSetting.getEyeBlinkParameterId(i));
+    // modelSetting が渡された場合のみ ID を収集
+    if (modelSetting) {
+      const count = modelSetting.getEyeBlinkParameterCount();
+      for (let i = 0; i < count; ++i) {
+        // インターフェース準拠: 戻り値は CubismIdHandle（null にはしない）
+        const id = modelSetting.getEyeBlinkParameterId(i);
+        this._parameterIds.pushBack(id);
+      }
     }
   }
 
-  /**
-   * 次の瞬きのタイミングの決定
-   *
-   * @return 次のまばたきを行う時刻[秒]
-   */
+  /** 次の瞬きのタイミングの決定 */
   public determinNextBlinkingTiming(): number {
     const r: number = Math.random();
-    return (
-      this._userTimeSeconds + r * (2.0 * this._blinkingIntervalSeconds - 1.0)
-    );
+    return this._userTimeSeconds + r * (2.0 * this._blinkingIntervalSeconds - 1.0);
   }
 
-  _blinkingState: number; // 現在の状態
-  _parameterIds: csmVector<CubismIdHandle>; // 操作対象のパラメータのIDのリスト
-  _nextBlinkingTime: number; // 次のまばたきの時刻[秒]
-  _stateStartTimeSeconds: number; // 現在の状態が開始した時刻[秒]
-  _blinkingIntervalSeconds: number; // まばたきの間隔[秒]
-  _closingSeconds: number; // まぶたを閉じる動作の所要時間[秒]
-  _closedSeconds: number; // まぶたを閉じている動作の所要時間[秒]
-  _openingSeconds: number; // まぶたを開く動作の所要時間[秒]
-  _userTimeSeconds: number; // デルタ時間の積算値[秒]
+  private _blinkingState: EyeState;                 // 現在の状態
+  private _parameterIds: csmVector<CubismIdHandle>; // 操作対象のパラメータのIDのリスト
+  private _nextBlinkingTime: number;                // 次のまばたきの時刻[秒]
+  private _stateStartTimeSeconds: number;           // 現在の状態が開始した時刻[秒]
+  private _blinkingIntervalSeconds: number;         // まばたきの間隔[秒]
+  private _closingSeconds: number;                  // まぶたを閉じる時間[秒]
+  private _closedSeconds: number;                   // まぶたを閉じたままの時間[秒]
+  private _openingSeconds: number;                  // まぶたを開く時間[秒]
+  private _userTimeSeconds: number;                 // デルタ時間の積算値[秒]
 
   /**
    * IDで指定された目のパラメータが、0のときに閉じるなら true 、1の時に閉じるなら false 。
@@ -210,17 +176,13 @@ export class CubismEyeBlink {
   static readonly CloseIfZero: boolean = true;
 }
 
-/**
- * まばたきの状態
- *
- * まばたきの状態を表す列挙型
- */
+/** まばたきの状態 */
 export enum EyeState {
-  EyeState_First = 0, // 初期状態
-  EyeState_Interval, // まばたきしていない状態
-  EyeState_Closing, // まぶたが閉じていく途中の状態
-  EyeState_Closed, // まぶたが閉じている状態
-  EyeState_Opening // まぶたが開いていく途中の状態
+  EyeState_First = 0,
+  EyeState_Interval,
+  EyeState_Closing,
+  EyeState_Closed,
+  EyeState_Opening
 }
 
 // Namespace definition for compatibility.

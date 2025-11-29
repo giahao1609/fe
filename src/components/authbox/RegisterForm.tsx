@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import { AuthService } from "@/services/auth.service";
+import { useAuth } from "@/context/AuthContext";
 
 interface RegisterFormProps {
   onSwitchTab?: () => void;
@@ -10,6 +11,7 @@ interface RegisterFormProps {
 
 export default function RegisterForm({ onSwitchTab }: RegisterFormProps) {
   const router = useRouter();
+  const { login } = useAuth();
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -19,8 +21,6 @@ export default function RegisterForm({ onSwitchTab }: RegisterFormProps) {
   const [showPw, setShowPw] = useState(false);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const API = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,18 +37,25 @@ export default function RegisterForm({ onSwitchTab }: RegisterFormProps) {
 
     setLoading(true);
     try {
-      await axios.post(`${API}/auth/register`, {
-        username: form.username.trim(),
+      const res = await AuthService.register({
         email: form.email.trim(),
         password: form.password,
+        displayName: form.username.trim(),
       });
-      setMsg("✅ Tạo tài khoản thành công! Mời bạn đăng nhập.");
-      setTimeout(
-        () => (onSwitchTab ? onSwitchTab() : router.push("/auth")),
-        700
-      );
+
+      if (res?.accessToken) {
+        setMsg("Tạo tài khoản thành công! Đang chuyển hướng…");
+        await login(res.accessToken, res.user);
+        router.push("/");
+      }
     } catch (err: any) {
-      setMsg(err?.response?.data?.message || "❌ Không thể đăng ký.");
+   
+      const rawMsg = err?.message || "";
+      if (rawMsg === "EMAIL_EXISTS") {
+        setMsg("Email đã tồn tại.");
+      } else if (!rawMsg) {
+        setMsg("❌ Không thể đăng ký.");
+      }
     } finally {
       setLoading(false);
     }
@@ -127,7 +134,7 @@ export default function RegisterForm({ onSwitchTab }: RegisterFormProps) {
         </button>
       </form>
 
-      {msg && <p className="mt-3 text-sm text-gray-700">{msg}</p>}
+      {msg && <p className="mt-3 text-sm text-red-700">{msg}</p>}
 
       <p className="mt-5 text-xs text-gray-500">
         Đã có tài khoản?{" "}

@@ -114,16 +114,8 @@ export default function Footer() {
                     Trung tâm trợ giúp
                   </Link>
                 </li>
-                <li>
-                  <Link className="hover:text-rose-400" href="/partners">
-                    Đăng ký đối tác
-                  </Link>
-                </li>
-                <li>
-                  <Link className="hover:text-rose-400" href="/contact">
-                    Liên hệ
-                  </Link>
-                </li>
+               
+             
               </ul>
             </div>
 
@@ -142,11 +134,7 @@ export default function Footer() {
                     Chính sách riêng tư
                   </Link>
                 </li>
-                <li>
-                  <Link className="hover:text-rose-400" href="/cookies">
-                    Cookie
-                  </Link>
-                </li>
+               
               </ul>
             </div>
           </div>
@@ -155,17 +143,7 @@ export default function Footer() {
         <div className="border-t border-white/10">
           <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-5 text-xs text-gray-400 sm:flex-row sm:px-6 lg:px-8">
             <p>© {year} All rights reserved.</p>
-            <div className="flex items-center gap-4">
-              <Link href="/about" className="hover:text-rose-400">
-                Giới thiệu
-              </Link>
-              <Link href="/contact" className="hover:text-rose-400">
-                Liên hệ
-              </Link>
-              <Link href="/privacy" className="hover:text-rose-400">
-                Chính sách
-              </Link>
-            </div>
+            
           </div>
         </div>
       </div>

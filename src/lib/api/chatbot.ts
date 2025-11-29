@@ -1,30 +1,56 @@
-import { api } from "./api";
+// src/lib/api/chatbot.ts
+"use client";
 
-export async function getFiles() {
-  const res = await api.get("/upload/ai/data");
-  return res.data;
+const LS_KEY = "fm_files";
+
+type FileRow = { name: string; url: string; createdAt: string; status?: string };
+
+function load(): FileRow[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); }
+  catch { return []; }
 }
 
-export async function uploadFile(file: File) {
-  const fd = new FormData();
-  fd.append("files", file);
-  const res = await api.post("/upload/ai/data", fd, {
-    headers: { "Content-Type": "multipart/form-data" },
+function save(list: FileRow[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LS_KEY, JSON.stringify(list));
+}
+
+export async function getFiles(): Promise<FileRow[]> {
+  return load();
+}
+
+// Demo: dùng blob: URL (sống theo phiên). Nếu muốn bền, có thể FileReader -> base64.
+export async function uploadFile(file: File): Promise<void> {
+  const list = load();
+  const url = URL.createObjectURL(file); // quick demo
+  list.unshift({
+    name: file.name,
+    url,
+    createdAt: new Date().toISOString(),
+    status: "indexed",
   });
-  return res.data;
+  save(list);
 }
 
-export async function deleteFile(filename: string) {
-  const res = await api.delete(`/upload/ai/data/${encodeURIComponent(filename)}`);
-  return res.data;
+export async function deleteFile(nameOrPath: string): Promise<void> {
+  // nameOrPath có thể là "folder/name.pdf" -> lấy phần cuối
+  const filename = nameOrPath.split("/").pop() || nameOrPath;
+  const next = load().filter((f) => {
+    // match theo: đúng tên, hoặc url kết thúc bằng filename (hữu ích với blob:)
+    return f.name !== filename && !f.url.endsWith(filename);
+  });
+  save(next);
 }
-
 export async function getHistory() {
-  const res = await api.get("/chat/history");
-  return res.data;
+  // mock trả về rỗng; sau này thay bằng API thực
+  return [
+    { id: "h1", user: "guest", createdAt: new Date().toISOString(), messageCount: 5 },
+    { id: "h2", user: "minhdao", createdAt: new Date().toISOString(), messageCount: 12 },
+  ];
 }
 
 export async function deleteHistory(id: string) {
-  const res = await api.delete(`/chat/history/${id}`);
-  return res.data;
+  // mock xoá
+  return { ok: true, id };
 }

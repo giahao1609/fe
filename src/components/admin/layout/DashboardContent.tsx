@@ -1,36 +1,65 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import axios from "axios";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area, ResponsiveContainer } from "recharts";
 import SoftCard from "./SoftCard";
 import ChartCard from "./ChartCard";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area } from "recharts";
+import { getAllRestaurants } from "@/lib/api/restaurant";
+import { getFiles } from "@/lib/api/chatbot";
 
+type Pt = { date: string; reviews?: number; chats?: number };
 interface Stats {
   restaurants: number;
   reviews: number;
   users: number;
   files: number;
-  reviewChart: { date: string; reviews: number }[];
-  chatbotChart: { date: string; chats: number }[];
+  reviewChart: Pt[];
+  chatbotChart: Pt[];
 }
+
+const lastNDays = (n: number) => {
+  const out: string[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+};
 
 export default function DashboardContent() {
   const [data, setData] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const res = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/admin/stats`);
-        setData(res.data);
-      } catch (err) {
-        console.error(" Lỗi khi tải thống kê:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
+    (async () => {
+      const restaurants = await getAllRestaurants();
+      const files = await getFiles();
+
+      // Fake số liệu
+      const users = 1287;
+      const reviews = Math.max(35, Math.round(restaurants.length * 12 + Math.random() * 40));
+
+      // Chart 14 ngày
+      const days = lastNDays(14);
+      const reviewChart = days.map((d) => ({
+        date: d,
+        reviews: Math.max(0, Math.round(5 + Math.random() * 20)),
+      }));
+      const chatbotChart = days.map((d) => ({
+        date: d,
+        chats: Math.max(0, Math.round(10 + Math.random() * 30)),
+      }));
+
+      setData({
+        restaurants: restaurants.length,
+        reviews,
+        users,
+        files: files.length,
+        reviewChart,
+        chatbotChart,
+      });
+      setLoading(false);
+    })();
   }, []);
 
   if (loading) return <p className="text-gray-500">Đang tải thống kê...</p>;
@@ -51,7 +80,7 @@ export default function DashboardContent() {
       {/* CHARTS */}
       <div className="grid md:grid-cols-2 gap-8">
         <ChartCard title="📈 Lượt đánh giá theo thời gian">
-          <LineChart data={data.reviewChart}>
+          <LineChart data={data.reviewChart} width={500} height={260}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 12 }} />
             <YAxis tick={{ fill: "#6b7280", fontSize: 12 }} />
@@ -61,7 +90,7 @@ export default function DashboardContent() {
         </ChartCard>
 
         <ChartCard title="🤖 Lượt tương tác Chatbot">
-          <AreaChart data={data.chatbotChart}>
+          <AreaChart data={data.chatbotChart} width={500} height={260}>
             <defs>
               <linearGradient id="chatColor" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#00b894" stopOpacity={0.8} />

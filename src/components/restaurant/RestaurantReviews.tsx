@@ -1,23 +1,29 @@
 "use client";
 
-import { useState, ChangeEvent } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Star, X } from "lucide-react";
-import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
+import {
+  ReviewService,
+  type Review,
+} from "@/services/review.service";
+import { NotifyService } from "@/services/notify.service";
 
 interface Props {
-  id: string;
-  API_URL?: string;
-  reviews: any[];
-  setReviews: (data: any[]) => void;
+  id: string; // restaurantId
+  API_URL?: string; // giữ lại cho compatible, không dùng nữa
+  reviews: Review[];
+  setReviews: (data: Review[]) => void;
   getImageUrl: (path?: string) => string;
 }
 
+const DEFAULT_AVATAR = "https://avatar.iran.liara.run/public";
+
 export default function RestaurantReviews({
   id,
-  API_URL,
+  API_URL, // eslint-disable-line @typescript-eslint/no-unused-vars
   reviews,
   setReviews,
   getImageUrl,
@@ -29,6 +35,19 @@ export default function RestaurantReviews({
   const [loadingReview, setLoadingReview] = useState(false);
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
+
+  // 🔁 Luôn load toàn bộ danh sách đánh giá khi vào trang / khi id đổi
+  useEffect(() => {
+    const loadAllReviews = async () => {
+      try {
+        const all = await ReviewService.listByRestaurant(id);
+        setReviews(all);
+      } catch (err) {
+        console.error("❌ Load reviews thất bại:", err);
+      }
+    };
+    if (id) loadAllReviews();
+  }, [id, setReviews]);
 
   // 🖼️ Chọn ảnh upload
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -47,34 +66,45 @@ export default function RestaurantReviews({
     setFilePreviews(np);
   };
 
-  // 📨 Gửi review
+  // 📨 Gửi review (dùng ReviewService)
   const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return alert("Vui lòng đăng nhập để gửi đánh giá!");
-    if (!comment.trim() && files.length === 0)
-      return alert("Vui lòng nhập nội dung hoặc chọn ảnh!");
-    if (rating === 0) return alert("Vui lòng chọn số sao!");
+
+    if (!user) {
+      alert("Vui lòng đăng nhập để gửi đánh giá!");
+      return;
+    }
+    if (!comment.trim() && files.length === 0) {
+      alert("Vui lòng nhập nội dung hoặc chọn ảnh!");
+      return;
+    }
+    if (rating === 0) {
+      alert("Vui lòng chọn số sao!");
+      return;
+    }
 
     setLoadingReview(true);
     try {
-      const fd = new FormData();
-      fd.append("content", comment);
-      fd.append("rating", String(rating));
-      files.forEach((f) => fd.append("files", f));
-
-      await axios.post(`${API_URL}/review/${user._id}/${id}`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
+      await ReviewService.createForRestaurant({
+        restaurantId: id,
+        content: comment,
+        rating,
+        images: files,
       });
 
-      const res = await axios.get(`${API_URL}/review/restaurant/${id}`);
-      setReviews(res.data);
+      // Reload full list sau khi gửi
+      const nextReviews = await ReviewService.listByRestaurant(id);
+      setReviews(nextReviews);
 
       setComment("");
       setFiles([]);
       setFilePreviews([]);
       setRating(0);
-    } catch (err) {
+    } catch (err: any) {
       console.error("❌ Gửi review thất bại:", err);
+      NotifyService.error?.(
+        err?.message || "Gửi đánh giá thất bại, vui lòng thử lại sau.",
+      );
     } finally {
       setLoadingReview(false);
     }
@@ -88,10 +118,14 @@ export default function RestaurantReviews({
 
       {/* --- Form nhập đánh giá --- */}
       {user ? (
-        <form onSubmit={handleSubmitReview} className="space-y-4" suppressHydrationWarning>
+        <form
+          onSubmit={handleSubmitReview}
+          className="space-y-4"
+          suppressHydrationWarning
+        >
           <div className="flex items-start gap-3">
             <Image
-              src={user?.avatar || "/image/default-avatar.png"}
+              src={DEFAULT_AVATAR}
               alt={user?.name || "Ảnh đại diện người dùng"}
               width={48}
               height={48}
@@ -107,7 +141,9 @@ export default function RestaurantReviews({
                     onClick={() => setRating(star)}
                     onMouseEnter={() => setHoverRating(star)}
                     onMouseLeave={() => setHoverRating(0)}
-                    fill={star <= (hoverRating || rating) ? "#facc15" : "none"}
+                    fill={
+                      star <= (hoverRating || rating) ? "#facc15" : "none"
+                    }
                     stroke="#facc15"
                     className="w-6 h-6 cursor-pointer transition-transform hover:scale-110"
                   />
@@ -148,7 +184,10 @@ export default function RestaurantReviews({
           {filePreviews.length > 0 && (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 mt-3">
               {filePreviews.map((src, i) => (
-                <div key={i} className="relative w-full aspect-square rounded overflow-hidden">
+                <div
+                  key={i}
+                  className="relative w-full aspect-square rounded overflow-hidden"
+                >
                   <Image
                     src={src}
                     alt={`preview-${i}`}
@@ -183,12 +222,12 @@ export default function RestaurantReviews({
         {reviews.length === 0 ? (
           <p className="text-gray-500 text-sm">Chưa có đánh giá nào.</p>
         ) : (
-          reviews.map((r: any) => (
+          reviews.map((r) => (
             <div key={r._id} className="border-b pb-3">
               <div className="flex items-start gap-3">
                 <Image
-                  src={"/default-avatar.png"}
-                  alt={r.userName || "Ảnh người dùng"}
+                  src={DEFAULT_AVATAR}
+                  alt={(r as any).userName || "Ảnh người dùng"}
                   width={40}
                   height={40}
                   className="rounded-full border mt-1"
@@ -196,9 +235,12 @@ export default function RestaurantReviews({
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold text-gray-800">
-                      {r.userName || "Người dùng"}
+                      {(r as any).userName || "Người dùng"}
                     </h4>
-                    <span className="text-sm text-gray-400" suppressHydrationWarning>
+                    <span
+                      className="text-sm text-gray-400"
+                      suppressHydrationWarning
+                    >
                       {r.createdAt
                         ? new Date(r.createdAt).toISOString().split("T")[0]
                         : ""}
@@ -211,7 +253,7 @@ export default function RestaurantReviews({
                       <Star
                         key={s}
                         size={16}
-                        fill={s <= r.rating ? "currentColor" : "none"}
+                        fill={s <= (r.rating || 0) ? "currentColor" : "none"}
                         stroke="currentColor"
                       />
                     ))}
@@ -220,9 +262,9 @@ export default function RestaurantReviews({
                   <p className="text-gray-700 text-sm mt-1">{r.content}</p>
 
                   {/* 🖼️ Ảnh review (dùng getImageUrl) */}
-                  {r.images?.length > 0 && (
+                  {r.images?.length ? (
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-2">
-                      {r.images.map((img: string, i: number) => (
+                      {r.images.map((img, i) => (
                         <div
                           key={i}
                           className="relative w-full aspect-square rounded overflow-hidden"
@@ -237,7 +279,7 @@ export default function RestaurantReviews({
                         </div>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </div>

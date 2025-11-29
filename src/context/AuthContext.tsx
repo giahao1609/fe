@@ -1,12 +1,13 @@
 "use client";
+
 import { createContext, useContext, useEffect, useState } from "react";
-import { jwtDecode } from "jwt-decode";
-import api from "@/lib/api";
+import { AuthService, type AuthUser } from "@/services/auth.service";
+import { ApiService, nameCookies } from "@/services/api.service";
 
 interface AuthContextType {
-  user: any;
+  user: AuthUser | null;
   token: string | null;
-  login: (token: string) => Promise<void>;
+  login: (token: string, user?: AuthUser | null) => Promise<void>;
   logout: () => void;
   reloadUser: () => Promise<void>;
 }
@@ -19,81 +20,78 @@ const AuthContext = createContext<AuthContextType>({
   reloadUser: async () => {},
 });
 
+const isBrowser =
+  typeof window !== "undefined" && typeof document !== "undefined";
+
+const getTokenFromCookies = (): string | null => {
+  if (!isBrowser) return null;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${nameCookies}=`));
+  if (!match) return null;
+  return decodeURIComponent(match.split("=")[1] || "");
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
 
-  // ✅ Giải mã token JWT để lấy thông tin user sơ bộ (Google, Local)
-  const decodeUserFromToken = (t: string) => {
-    try {
-      const decoded: any = jwtDecode(t);
-      setUser({
-        email: decoded.email,
-        name: decoded.name,
-        picture: decoded.picture || null, // hỗ trợ Google avatar
-      });
-    } catch (err) {
-      console.warn("⚠️ Token decode lỗi, vẫn giữ nguyên token");
+  const reloadUser = async () => {
+    if (!isBrowser) return;
+
+    const cookieToken = getTokenFromCookies();
+    if (!cookieToken) {
+      setUser(null);
+      setToken(null);
+      return;
+    }
+
+    ApiService.setToken(cookieToken);
+    setToken(cookieToken);
+
+    const me = await AuthService.me();
+    if (me) {
+      setUser(me);
+    } else {
+      setUser(null);
     }
   };
 
-  // ✅ Gọi API backend để lấy thông tin chính xác nhất (nếu token hợp lệ)
-  const loadUser = async (jwt?: string) => {
-    const t = jwt || localStorage.getItem("token");
-    if (!t) return;
-
-    setToken(t);
-    decodeUserFromToken(t);
-
-    try {
-      const res = await api.get("/auth/me", {
-        headers: { Authorization: `Bearer ${t}` },
-      });
-
-      if (res.data?.email || res.data?.name) {
-        setUser({
-          ...res.data,
-          picture: res.data.picture || user?.picture || null,
-        });
-      } else {
-        console.warn("⚠️ /auth/me không trả user hợp lệ");
-      }
-    } catch (err) {
-      console.error("❌ Lỗi tải user:", err);
-    }
-  };
-
-  // ✅ Khi app load lại → kiểm tra token trong localStorage
   useEffect(() => {
-    const t = localStorage.getItem("token");
-    if (t) {
-      setToken(t);
-      decodeUserFromToken(t);
-      loadUser(t);
-      api.defaults.headers.common["Authorization"] = `Bearer ${t}`;
-    }
+    (async () => {
+      await reloadUser();
+      setHydrated(true);
+    })();
   }, []);
 
-  // ✅ Khi login xong
-  const login = async (t: string) => {
-    localStorage.setItem("token", t);
-    setToken(t);
-    decodeUserFromToken(t);
+  const login = async (accessToken: string, userFromApi?: AuthUser | null) => {
+    if (!isBrowser) return;
 
-    // Gắn token vào axios instance để các request sau có Bearer tự động
-    api.defaults.headers.common["Authorization"] = `Bearer ${t}`;
+    ApiService.setToken(accessToken);
+    setToken(accessToken);
 
-    await loadUser(t);
+    if (userFromApi) {
+      setUser(userFromApi);
+    } else {
+      const me = await AuthService.me();
+      setUser(me);
+    }
   };
 
-  // ✅ Khi logout
   const logout = () => {
-    localStorage.removeItem("token");
-    delete api.defaults.headers.common["Authorization"];
+    AuthService.logout(); 
     setUser(null);
     setToken(null);
-    window.location.href = "/auth";
+
+    if (isBrowser) {
+      window.location.href = "/auth";
+    }
   };
+
+  if (!hydrated && isBrowser) {
+    return null;
+  }
 
   return (
     <AuthContext.Provider
@@ -102,7 +100,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         token,
         login,
         logout,
-        reloadUser: loadUser,
+        reloadUser,
       }}
     >
       {children}

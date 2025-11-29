@@ -12,7 +12,6 @@ export default function AuthBox() {
       <div className="absolute inset-0 -z-10 bg-gradient-to-br from-rose-50 via-white to-amber-50" />
 
       <div className="mx-auto flex max-w-6xl flex-col items-center px-4 py-10 sm:px-6 lg:px-8">
-        {/* logo / tagline */}
         <div className="mb-6 text-center">
           <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-rose-600 text-white shadow-md">
             <span className="text-2xl">🍜</span>
@@ -54,7 +53,6 @@ export default function AuthBox() {
             </div>
           </div>
 
-          {/* Cột phải: CTA (ẩn trên mobile) */}
           <div className="relative hidden min-h-[520px] lg:block">
             <div className="absolute inset-0 bg-gradient-to-br from-rose-600 via-rose-500 to-amber-400" />
             <div className="absolute inset-0 bg-[url('/image/hero-food.jpg')] bg-cover bg-center mix-blend-soft-light opacity-90" />
@@ -105,7 +103,6 @@ export default function AuthBox() {
           </div>
         </div>
 
-        {/* note nhỏ */}
         <p className="mt-4 text-center text-xs text-gray-500">
           Bằng việc tiếp tục, bạn đồng ý với{" "}
           <a href="/policy" className="text-rose-700 hover:underline">

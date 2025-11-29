@@ -1,19 +1,16 @@
 import axios from "axios";
 
-// ✅ Tự động lấy BASE_URL từ .env (nếu có), fallback localhost
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-// ✅ Tạo instance mặc định
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: false, // bật true nếu backend dùng cookie auth
+  withCredentials: false,
 });
 
-// ✅ Thêm interceptor tự động gắn token (nếu có)
 api.interceptors.request.use(
   (config) => {
     const token =
@@ -30,7 +27,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ✅ Xử lý lỗi tập trung
 api.interceptors.response.use(
   (res) => res,
   (error) => {

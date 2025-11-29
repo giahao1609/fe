@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
+import { AuthService } from "@/services/auth.service";
 
 interface LoginFormProps {
   onSwitchTab?: () => void;
@@ -18,31 +18,42 @@ export default function LoginForm({ onSwitchTab }: LoginFormProps) {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const API = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg("");
+
     if (!form.email || !form.password) {
       setMsg("Vui lòng nhập đầy đủ Email và Mật khẩu.");
       return;
     }
+
     setLoading(true);
     try {
-      const res = await axios.post(`${API}/auth/login`, form);
-      await login(res.data.accessToken);
-      setMsg("✅ Đăng nhập thành công!");
-      router.push("/");
+      const res = await AuthService.login({
+        email: form.email.trim(),
+        password: form.password,
+      });
+
+      if (res?.accessToken) {
+        await login(res.accessToken, res.user);
+        setMsg("✅ Đăng nhập thành công!");
+        router.push("/");
+      }
     } catch (err: any) {
-      setMsg(err?.response?.data?.message || "❌ Đăng nhập thất bại!");
+      const rawMsg = err?.message || "";
+
+      if (rawMsg === "INVALID_CREDENTIALS") {
+        setMsg("Email hoặc mật khẩu không đúng, vui lòng kiểm tra lại.");
+      } else if (!rawMsg) {
+        setMsg("❌ Đăng nhập thất bại!");
+      }
     } finally {
       setLoading(false);
     }
   };
 
+
   const handleGoogleLogin = () => {
-    // Tuỳ backend: nếu dùng OAuth proxy tại FE → /api/auth/google
-    // hoặc direct server URL: `${API}/auth/google`
     window.location.href = "/api/auth/google";
   };
 
@@ -55,23 +66,7 @@ export default function LoginForm({ onSwitchTab }: LoginFormProps) {
         Tiếp tục FoodTour, tìm quán ngon gần bạn 🍜
       </p>
 
-      <button
-        onClick={handleGoogleLogin}
-        className="mt-5 inline-flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-rose-300 hover:text-rose-700"
-      >
-        <img
-          src="https://www.svgrepo.com/show/475656/google-color.svg"
-          className="h-5 w-5"
-          alt="Google"
-        />
-        Đăng nhập với Google
-      </button>
-
-      <div className="my-4 flex items-center gap-3">
-        <div className="h-px flex-1 bg-gray-200" />
-        <span className="text-xs text-gray-500">hoặc</span>
-        <div className="h-px flex-1 bg-gray-200" />
-      </div>
+    
 
       <form onSubmit={handleLogin} className="flex flex-col gap-3">
         <label className="text-sm font-medium text-gray-800">Email</label>
@@ -128,7 +123,7 @@ export default function LoginForm({ onSwitchTab }: LoginFormProps) {
         </button>
       </form>
 
-      {msg && <p className="mt-3 text-sm text-gray-700">{msg}</p>}
+      {msg && <p className="mt-3 text-sm text-red-700 ">{msg}</p>}
 
       <p className="mt-5 text-xs text-gray-500">
         Chưa có tài khoản?{" "}
