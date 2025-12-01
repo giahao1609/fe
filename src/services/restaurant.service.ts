@@ -179,17 +179,32 @@ export const RestaurantService = {
    *
    * curl --location 'https://api.food-map.online/api/v1/owner/restaurants/detail/691f71667ddc4ff2de6cdeb4'
    */
-  async getRestaurantDetail(id: string): Promise<Restaurant> {
+  // services/restaurant.service.ts
+
+  async getRestaurantDetail(
+    id: string,
+    opts?: { lat?: number | null; lng?: number | null }
+  ): Promise<Restaurant> {
     if (!id) {
       throw new Error("Restaurant id is required");
     }
 
+    const params: Record<string, any> = {};
+
+    // chỉ gửi lên khi thực sự có số
+    if (typeof opts?.lat === "number" && typeof opts?.lng === "number") {
+      params.lat = opts.lat;
+      params.lng = opts.lng;
+    }
+
     const res = await ApiService.get<Restaurant>(
       `/owner/restaurants/detail/${id}`,
+      { params }
     );
 
     return res;
   },
+
 
   /**
    * GET /api/v1/owner/restaurants/nearby

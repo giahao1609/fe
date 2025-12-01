@@ -9,11 +9,20 @@ import {
   RestaurantService,
   type Restaurant,
 } from "@/services/restaurant.service";
+import {
+  formatPriceRange,
+  getCategoryLabel,
+  getCategoryMeta,
+  getMainImage,
+} from "@/utils/function";
+import Link from "next/link";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_API_KEY || "";
 
 const HCM_CENTER = { lng: 106.70098, lat: 10.77653 }; // Bưu điện TP
-const HCM_BBOX: [number, number, number, number] = [106.55, 10.68, 106.85, 10.9];
+const HCM_BBOX: [number, number, number, number] = [
+  106.55, 10.68, 106.85, 10.9,
+];
 
 export default function FoodMapView() {
   const token = process.env.NEXT_PUBLIC_MAPBOX_API_KEY || "";
@@ -35,7 +44,14 @@ export default function FoodMapView() {
 
   // dùng ref để giữ center ban đầu: khi lat/lng có trước khi map init thì vẫn dùng được
   const initialCenterRef = useRef<{ lng: number; lat: number }>(HCM_CENTER);
-
+  const createRestaurantPopup = () =>
+    new mapboxgl.Popup({
+      closeButton: true,
+      closeOnClick: true,
+      offset: 16,
+      maxWidth: "280px",
+      className: "restaurant-popup", // dùng CSS custom
+    });
   useEffect(() => {
     if (typeof lat === "number" && typeof lng === "number") {
       initialCenterRef.current = { lng, lat };
@@ -66,9 +82,18 @@ export default function FoodMapView() {
       attributionControl: true,
     });
 
+    // const map = new mapboxgl.Map({
+    //   container: mapElRef.current,
+    //   style: "mapbox://styles/mapbox/light-v11", // nền sáng, ít rối hơn
+    //   center: [center.lng, center.lat],
+    //   zoom: 14,
+    //   cooperativeGestures: true,
+    //   attributionControl: true,
+    // });
+
     map.addControl(
       new mapboxgl.NavigationControl({ visualizePitch: true }),
-      "top-right",
+      "top-right"
     );
     map.addControl(new mapboxgl.FullscreenControl(), "top-right");
     map.addControl(
@@ -78,7 +103,7 @@ export default function FoodMapView() {
         showAccuracyCircle: false,
         fitBoundsOptions: { maxZoom: 16 },
       }),
-      "top-right",
+      "top-right"
     );
 
     // load geocoder
@@ -141,7 +166,7 @@ export default function FoodMapView() {
           map.addImage(
             "restaurant-icon",
             await generateDotIcon(32, "#e11d48"),
-            { sdf: false },
+            { sdf: false }
           );
         }
       }
@@ -152,6 +177,26 @@ export default function FoodMapView() {
           type: "geojson",
           data: emptyFC(),
         });
+        // map.addLayer({
+        //   id: "restaurants-symbol",
+        //   type: "symbol",
+        //   source: "restaurants",
+        //   layout: {
+        //     "icon-image": "restaurant-icon",
+        //     "icon-size": 0.8,
+        //     "icon-allow-overlap": true,
+        //     "icon-anchor": "bottom",
+        //     "text-field": ["get", "name"],
+        //     "text-offset": [0, 1.2],
+        //     "text-size": 11,
+        //     "text-optional": true,
+        //   },
+        //   paint: {
+        //     "text-color": "#111827",
+        //     "text-halo-width": 1,
+        //     "text-halo-color": "#ffffff",
+        //   },
+        // });
         map.addLayer({
           id: "restaurants-symbol",
           type: "symbol",
@@ -161,7 +206,12 @@ export default function FoodMapView() {
             "icon-size": 0.8,
             "icon-allow-overlap": true,
             "icon-anchor": "bottom",
-            "text-field": ["get", "name"],
+            "text-field": [
+              "concat",
+              ["coalesce", ["get", "categoryIcon"], ""],
+              " ",
+              ["get", "name"],
+            ],
             "text-offset": [0, 1.2],
             "text-size": 11,
             "text-optional": true,
@@ -173,12 +223,57 @@ export default function FoodMapView() {
           },
         });
 
+        // map.on("click", "restaurants-symbol", (e: MapLayerMouseEvent) => {
+        //   const feature = e.features?.[0];
+        //   if (!feature) return;
+        //   const coords = (feature.geometry as any).coordinates as [
+        //     number,
+        //     number
+        //   ];
+        //   const props = feature.properties as any;
+
+        //   const name = props.name;
+        //   const address = props.address;
+        //   const distanceText = props.distanceText;
+        //   const priceRange = props.priceRange;
+
+        //   const directionsUrl = buildDirectionsUrlFromCoords(
+        //     coords,
+        //     typeof lat === "number" ? lat : undefined,
+        //     typeof lng === "number" ? lng : undefined
+        //   );
+
+        //   // if (!popupRef.current) {
+        //   //   popupRef.current = new mapboxgl.Popup({
+        //   //     closeButton: true,
+        //   //     closeOnClick: true,
+        //   //   });
+        //   // }
+
+        //   if (!popupRef.current) {
+        //     popupRef.current = createRestaurantPopup();
+        //   }
+
+        //   popupRef.current
+        //     .setLngLat(coords)
+        //     .setHTML(
+        //       popupHtml({
+        //         name,
+        //         address,
+        //         distanceText,
+        //         priceRange,
+        //         directionsUrl,
+        //       })
+        //     )
+        //     .addTo(map);
+        // });
+
         map.on("click", "restaurants-symbol", (e: MapLayerMouseEvent) => {
           const feature = e.features?.[0];
           if (!feature) return;
           const coords = (feature.geometry as any).coordinates as [
             number,
-            number,
+            number
           ];
           const props = feature.properties as any;
 
@@ -186,18 +281,17 @@ export default function FoodMapView() {
           const address = props.address;
           const distanceText = props.distanceText;
           const priceRange = props.priceRange;
+          const categoryName = props.categoryName;
+          const categoryIcon = props.categoryIcon;
 
           const directionsUrl = buildDirectionsUrlFromCoords(
             coords,
             typeof lat === "number" ? lat : undefined,
-            typeof lng === "number" ? lng : undefined,
+            typeof lng === "number" ? lng : undefined
           );
 
           if (!popupRef.current) {
-            popupRef.current = new mapboxgl.Popup({
-              closeButton: true,
-              closeOnClick: true,
-            });
+            popupRef.current = createRestaurantPopup();
           }
 
           popupRef.current
@@ -208,8 +302,10 @@ export default function FoodMapView() {
                 address,
                 distanceText,
                 priceRange,
+                categoryName,
+                categoryIcon,
                 directionsUrl,
-              }),
+              })
             )
             .addTo(map);
         });
@@ -296,6 +392,7 @@ export default function FoodMapView() {
           limit: debouncedParams.limit,
         });
         if (!cancelled) {
+          console.log(res.items);
           setRestaurants(res.items);
         }
       } catch (e: any) {
@@ -318,32 +415,70 @@ export default function FoodMapView() {
   }, [debouncedParams]);
 
   // ===================== GEOJSON CHO MAP (memo hoá) =====================
-  const restaurantsFeatureCollection = useMemo<GeoJSON.FeatureCollection>(() => {
-    return {
-      type: "FeatureCollection",
-      features: restaurants
-        .map((r) => {
-          const coords = getRestaurantCoords(r);
-          if (!coords) return null;
+  // const restaurantsFeatureCollection =
+  //   useMemo<GeoJSON.FeatureCollection>(() => {
+  //     return {
+  //       type: "FeatureCollection",
+  //       features: restaurants
+  //         .map((r) => {
+  //           const coords = getRestaurantCoords(r);
+  //           if (!coords) return null;
 
-          return {
-            type: "Feature",
-            geometry: {
-              type: "Point",
-              coordinates: [coords.lng, coords.lat],
-            },
-            properties: {
-              _id: r._id,
-              name: r.name,
-              address: buildShortAddress(r),
-              distanceText: r.distanceText ?? formatDistance(r.distanceKm),
-              priceRange: r.priceRange,
-            },
-          } as GeoJSON.Feature;
-        })
-        .filter(Boolean) as GeoJSON.Feature[],
-    };
-  }, [restaurants]);
+  //           return {
+  //             type: "Feature",
+  //             geometry: {
+  //               type: "Point",
+  //               coordinates: [coords.lng, coords.lat],
+  //             },
+  //             properties: {
+  //               _id: r._id,
+  //               name: r.name,
+  //               address: buildShortAddress(r),
+  //               distanceText: r.distanceText ?? formatDistance(r.distanceKm),
+  //               priceRange: r.priceRange,
+  //             },
+  //           } as GeoJSON.Feature;
+  //         })
+  //         .filter(Boolean) as GeoJSON.Feature[],
+  //     };
+  //   }, [restaurants]);
+
+  const restaurantsFeatureCollection =
+    useMemo<GeoJSON.FeatureCollection>(() => {
+      return {
+        type: "FeatureCollection",
+        features: restaurants
+          .map((r) => {
+            const coords = getRestaurantCoords(r);
+            if (!coords) return null;
+
+            const {
+              name: categoryName,
+              slug: categorySlug,
+              icon: categoryIcon,
+            } = getCategoryMeta(r);
+
+            return {
+              type: "Feature",
+              geometry: {
+                type: "Point",
+                coordinates: [coords.lng, coords.lat],
+              },
+              properties: {
+                _id: r._id,
+                name: r.name,
+                address: buildShortAddress(r),
+                distanceText: r.distanceText ?? formatDistance(r.distanceKm),
+                priceRange: r.priceRange,
+                categoryName,
+                categorySlug,
+                categoryIcon,
+              },
+            } as GeoJSON.Feature;
+          })
+          .filter(Boolean) as GeoJSON.Feature[],
+      };
+    }, [restaurants]);
 
   // ===================== ĐỔ GEOJSON VÀO MAP SOURCE =====================
   useEffect(() => {
@@ -377,6 +512,52 @@ export default function FoodMapView() {
     }
   };
 
+  // const handleRestaurantClick = (r: Restaurant) => {
+  //   const map = mapRef.current;
+  //   if (!map) return;
+
+  //   const coords = getRestaurantCoords(r);
+  //   if (!coords) return;
+
+  //   const center: [number, number] = [coords.lng, coords.lat];
+  //   map.flyTo({
+  //     center,
+  //     zoom: 16,
+  //     speed: 0.9,
+  //     curve: 1.4,
+  //   });
+
+  //   const directionsUrl = buildDirectionsUrlFromCoords(
+  //     center,
+  //     typeof lat === "number" ? lat : undefined,
+  //     typeof lng === "number" ? lng : undefined
+  //   );
+
+  //   // if (!popupRef.current) {
+  //   //   popupRef.current = new mapboxgl.Popup({
+  //   //     closeButton: true,
+  //   //     closeOnClick: true,
+  //   //   });
+  //   // }
+
+  //   if (!popupRef.current) {
+  //     popupRef.current = createRestaurantPopup();
+  //   }
+
+  //   popupRef.current
+  //     .setLngLat(center)
+  //     .setHTML(
+  //       popupHtml({
+  //         name: r.name,
+  //         address: buildShortAddress(r),
+  //         distanceText: r.distanceText ?? formatDistance(r.distanceKm),
+  //         priceRange: r.priceRange,
+  //         directionsUrl,
+  //       })
+  //     )
+  //     .addTo(map);
+  // };
+
   const handleRestaurantClick = (r: Restaurant) => {
     const map = mapRef.current;
     if (!map) return;
@@ -395,14 +576,13 @@ export default function FoodMapView() {
     const directionsUrl = buildDirectionsUrlFromCoords(
       center,
       typeof lat === "number" ? lat : undefined,
-      typeof lng === "number" ? lng : undefined,
+      typeof lng === "number" ? lng : undefined
     );
 
+    const { name: categoryName, icon: categoryIcon } = getCategoryMeta(r);
+
     if (!popupRef.current) {
-      popupRef.current = new mapboxgl.Popup({
-        closeButton: true,
-        closeOnClick: true,
-      });
+      popupRef.current = createRestaurantPopup();
     }
 
     popupRef.current
@@ -413,8 +593,10 @@ export default function FoodMapView() {
           address: buildShortAddress(r),
           distanceText: r.distanceText ?? formatDistance(r.distanceKm),
           priceRange: r.priceRange,
+          categoryName,
+          categoryIcon,
           directionsUrl,
-        }),
+        })
       )
       .addTo(map);
   };
@@ -478,7 +660,8 @@ export default function FoodMapView() {
 
       {!token && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          Thiếu <code>NEXT_PUBLIC_MAPBOX_API_KEY</code> trong <code>.env.local</code>.
+          Thiếu <code>NEXT_PUBLIC_MAPBOX_API_KEY</code> trong{" "}
+          <code>.env.local</code>.
         </div>
       )}
 
@@ -505,63 +688,157 @@ export default function FoodMapView() {
       )}
 
       {/* Danh sách quán dưới bản đồ */}
+      <h1 className="text-2xl font-bold text-gray-900">Danh sách quán ăn</h1>
       {!loading && restaurants.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {restaurants.map((r) => {
             const coords = getRestaurantCoords(r);
-            const distanceText =
-              r.distanceText ?? formatDistance(r.distanceKm);
+            const distanceText = r.distanceText ?? formatDistance(r.distanceKm);
             const directionsUrl = coords
               ? buildDirectionsUrlForRestaurant(
                   r,
                   typeof lat === "number" ? lat : undefined,
-                  typeof lng === "number" ? lng : undefined,
+                  typeof lng === "number" ? lng : undefined
                 )
               : undefined;
+
+            const mainImage = getMainImage(r);
+            const priceLabel = formatPriceRange(r.priceRange);
+
+            // ---- category meta (từ data mới) ----
+            const cat: any = (r as any).category || {};
+            const categoryName = (r as any).categoryName ?? cat.name;
+            const categorySlug = (r as any).categorySlug ?? cat.slug;
+            const categoryIcon: string | undefined = cat.extra?.icon;
 
             return (
               <article
                 key={r._id}
-                className="flex flex-col justify-between rounded-xl border border-gray-100 bg-white p-4 shadow-sm"
+                className="flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-md"
               >
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">
-                    {r.name}
-                  </h3>
-                  <p className="mt-1 text-xs text-gray-600">
-                    {buildShortAddress(r) || "Địa chỉ đang cập nhật"}
-                  </p>
+                {/* Ảnh */}
+                <button
+                  type="button"
+                  onClick={() => handleRestaurantClick(r)}
+                  className="relative aspect-[16/9] w-full overflow-hidden"
+                >
+                  {mainImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={mainImage}
+                      alt={r.name}
+                      className="h-full w-full object-cover transition-transform duration-200 hover:scale-[1.03]"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gray-50 text-xs text-gray-400">
+                      Không có hình ảnh
+                    </div>
+                  )}
+
                   {distanceText && (
-                    <p className="mt-1 text-xs text-gray-500">
+                    <span className="absolute left-3 top-3 rounded-full bg-black/70 px-3 py-1 text-[10px] font-medium text-white">
                       Cách bạn: {distanceText}
-                    </p>
+                    </span>
                   )}
-                  {r.priceRange && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Giá: {r.priceRange}
-                    </p>
-                  )}
-                </div>
+                </button>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleRestaurantClick(r)}
-                    className="inline-flex items-center rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-blue-300 hover:text-blue-700"
-                  >
-                    Xem trên bản đồ
-                  </button>
+                {/* Nội dung */}
+                <div className="flex flex-1 flex-col px-4 pb-3 pt-3">
+                  {/* Tên + rating */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-sm font-semibold text-gray-900">
+                        {r.name}
+                      </h3>
 
-                  {directionsUrl && (
-                    <a
-                      href={directionsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                      <p className="mt-0.5 line-clamp-2 text-[11px] text-gray-600">
+                        {buildShortAddress(r) || "Địa chỉ đang cập nhật"}
+                      </p>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        {/* category pill */}
+                        {categoryName && (
+                          <Link
+                            href={`/categories/${
+                              categorySlug || "restaurants"
+                            }`}
+                            className="inline-flex max-w-full items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 hover:bg-indigo-100"
+                          >
+                            {categoryIcon && <span>{categoryIcon}</span>}
+                            <span className="truncate">{categoryName}</span>
+                          </Link>
+                        )}
+
+                        {/* price pill */}
+                        {priceLabel && (
+                          <span className="inline-flex items-center rounded-full bg-gray-50 px-2 py-0.5 text-[10px] text-gray-600">
+                            {priceLabel}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {typeof r.rating === "number" && (
+                      <div className="flex items-center">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2 py-0.5 text-[11px] font-medium text-yellow-800">
+                          <span>★</span>
+                          <span>{r.rating.toFixed(1)}</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Distance / tags */}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                    {r.distanceKm != null && (
+                      <span className="inline-flex items-center rounded-full bg-gray-50 px-2 py-0.5">
+                        ~{r.distanceKm.toFixed(1)} km
+                      </span>
+                    )}
+
+                    {Array.isArray(r.tags) && r.tags.length > 0 && (
+                      <span className="line-clamp-1">
+                        {r.tags.slice(0, 3).join(" · ")}
+                        {r.tags.length > 3 && "…"}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <Link
+                      href={`/categories/restaurants/${r._id}`}
+                      className="inline-flex items-center justify-center rounded-full border border-gray-200 px-2 py-1.5 text-[11px] font-medium text-gray-700 hover:border-blue-300 hover:text-blue-700"
                     >
-                      Chỉ đường
-                    </a>
-                  )}
+                      Chi tiết
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRestaurantClick(r)}
+                      className="inline-flex items-center justify-center rounded-full border border-gray-200 px-2 py-1.5 text-[11px] font-medium text-gray-700 hover:border-blue-300 hover:text-blue-700"
+                    >
+                      Xem trên bản đồ
+                    </button>
+
+                    {directionsUrl ? (
+                      <a
+                        href={directionsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center rounded-full bg-blue-600 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-blue-700"
+                      >
+                        Chỉ đường
+                      </a>
+                    ) : (
+                      <button
+                        disabled
+                        className="inline-flex items-center justify-center rounded-full bg-gray-100 px-2 py-1.5 text-[11px] font-medium text-gray-400"
+                      >
+                        Chỉ đường
+                      </button>
+                    )}
+                  </div>
                 </div>
               </article>
             );
@@ -570,9 +847,9 @@ export default function FoodMapView() {
       )}
 
       {!loading && restaurants.length === 0 && !error && (
-        <p className="text-xs text-gray-500">
-          Không tìm thấy quán nào trong bán kính hiện tại. Thử tăng bán kính hoặc
-          kiểm tra lại vị trí của bạn.
+        <p className="mt-3 text-xs text-gray-500">
+          Không tìm thấy quán nào trong bán kính hiện tại. Thử tăng bán kính
+          hoặc kiểm tra lại vị trí của bạn.
         </p>
       )}
     </section>
@@ -595,12 +872,12 @@ function pointFeature(lon: number, lat: number): GeoJSON.Feature {
 
 function loadMapImage(
   map: Map,
-  url: string,
+  url: string
 ): Promise<HTMLImageElement | ImageBitmap> {
   return new Promise((resolve, reject) => {
     map.loadImage(url, (err, img) => {
       if (err || !img) return reject(err || new Error("Cannot load image"));
-      resolve(img);
+      resolve(img as any);
     });
   });
 }
@@ -631,7 +908,7 @@ function formatDistance(km?: number): string | undefined {
 }
 
 function getRestaurantCoords(
-  r: Restaurant,
+  r: Restaurant
 ): { lng: number; lat: number } | null {
   const lat =
     (r as any).coordinates?.lat ??
@@ -649,59 +926,156 @@ function getRestaurantCoords(
 function buildDirectionsUrlFromCoords(
   coords: [number, number],
   userLat?: number,
-  userLng?: number,
+  userLng?: number
 ): string {
   const [lng, lat] = coords;
   const dest = `${lat},${lng}`;
   if (typeof userLat === "number" && typeof userLng === "number") {
     const origin = `${userLat},${userLng}`;
     return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
-      origin,
+      origin
     )}&destination=${encodeURIComponent(dest)}`;
   }
   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
-    dest,
+    dest
   )}`;
 }
 
 function buildDirectionsUrlForRestaurant(
   r: Restaurant,
   userLat?: number,
-  userLng?: number,
+  userLng?: number
 ): string | undefined {
   const coords = getRestaurantCoords(r);
   if (!coords) return undefined;
   return buildDirectionsUrlFromCoords(
     [coords.lng, coords.lat],
     userLat,
-    userLng,
+    userLng
   );
 }
+
+// function popupHtml(args: {
+//   name: string;
+//   address: string;
+//   distanceText?: string;
+//   priceRange?: string;
+//   directionsUrl?: string;
+// }) {
+//   const { name, address, distanceText, priceRange, directionsUrl } = args;
+
+//   const priceLabel = priceRange ? formatPriceRange(priceRange) : "";
+
+//   return `
+//     <div class="text-[13px] leading-snug text-gray-800">
+//       <div class="mb-1 flex items-start justify-between gap-2">
+//         <div class="font-semibold text-[14px] text-gray-900 line-clamp-2">
+//           ${name}
+//         </div>
+//       </div>
+
+//       <div class="text-[11px] text-gray-600">
+//         ${address || "Địa chỉ đang cập nhật"}
+//       </div>
+
+//       ${
+//         distanceText
+//           ? `<div class="mt-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-700">
+//                Cách bạn: ${distanceText}
+//              </div>`
+//           : ""
+//       }
+
+//       ${
+//         priceLabel
+//           ? `<div class="mt-1 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
+//                ${priceLabel}
+//              </div>`
+//           : ""
+//       }
+
+//       ${
+//         directionsUrl
+//           ? `<div class="mt-3">
+//                <a
+//                  href="${directionsUrl}"
+//                  target="_blank"
+//                  rel="noopener noreferrer"
+//                  class="inline-flex w-full items-center justify-center rounded-full bg-blue-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-blue-700"
+//                >
+//                  Chỉ đường
+//                </a>
+//              </div>`
+//           : ""
+//       }
+//     </div>
+//   `;
+// }
 
 function popupHtml(args: {
   name: string;
   address: string;
   distanceText?: string;
   priceRange?: string;
+  categoryName?: string;
+  categoryIcon?: string;
   directionsUrl?: string;
 }) {
-  const { name, address, distanceText, priceRange, directionsUrl } = args;
+  const {
+    name,
+    address,
+    distanceText,
+    priceRange,
+    categoryName,
+    categoryIcon,
+    directionsUrl,
+  } = args;
+
+  const priceLabel = priceRange ? formatPriceRange(priceRange) : "";
+
+  const categoryChip = categoryName
+    ? `<div class="mb-1 inline-flex items-center rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
+           ${categoryIcon ? `<span class="mr-1">${categoryIcon}</span>` : ""}
+           <span>${categoryName}</span>
+         </div>`
+    : "";
+
   return `
-    <div class="text-sm">
-      <div class="font-semibold">${name}</div>
-      <div class="text-xs text-gray-600">${address}</div>
+    <div class="text-[13px] leading-snug">
+      ${categoryChip}
+      <div class="font-semibold text-[14px] mb-1">${name}</div>
+      <div class="text-[11px] text-gray-600">
+        ${address || "Địa chỉ đang cập nhật"}
+      </div>
+
       ${
         distanceText
-          ? `<div class="mt-1 text-xs">Cách bạn: ${distanceText}</div>`
+          ? `<div class="mt-1 inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-700">
+               Cách bạn: ${distanceText}
+             </div>`
           : ""
       }
-      ${priceRange ? `<div class="mt-1 text-xs">Giá: ${priceRange}</div>` : ""}
+
+      ${
+        priceLabel
+          ? `<div class="mt-1 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+               ${priceLabel}
+             </div>`
+          : ""
+      }
+
       ${
         directionsUrl
-          ? `<a href="${directionsUrl}" target="_blank" rel="noopener noreferrer"
-                class="mt-2 inline-flex items-center rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white">
-                Chỉ đường
-             </a>`
+          ? `<div class="mt-3">
+               <a
+                 href="${directionsUrl}"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 class="inline-flex w-full items-center justify-center rounded-full bg-blue-600 px-3 py-1.5 text-[11px] font-medium text-white"
+               >
+                 Chỉ đường
+               </a>
+             </div>`
           : ""
       }
     </div>

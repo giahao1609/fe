@@ -47,7 +47,7 @@ export default function RestaurantInfo({ restaurant }: { restaurant: Restaurant 
   const scheduleText = buildScheduleText(restaurant);
 
   return (
-    <div className="max-w-5xl mx-auto mt-[-80px] bg-white rounded-xl shadow-lg p-6 relative z-10">
+    <div className="max-w-5xl mx-auto mt-[-80px] bg-white rounded-xl shadow-lg p-6 z-10">
       <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
         {restaurant.name}
       </h1>
