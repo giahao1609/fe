@@ -2,7 +2,14 @@
 
 import React from "react";
 
-export type OwnerTab = "overview" | "store" | "comments" | "posts" | "restaurants"|"menu";
+export type OwnerTab =
+  | "overview"
+  | "store"
+  | "comments"
+  | "posts"
+  | "restaurants"
+  | "menu"
+  | "blogs";
 
 export default function OwnerSidebar({
   active,
@@ -69,6 +76,11 @@ export default function OwnerSidebar({
           id="menu"
           label="Menu"
           icon={<i className="fa-solid fa-utensils" />}
+        />
+        <Item
+          id="blogs"
+          label="Blog của tôi"
+          icon={<i className="fa-solid fa-blog" />}
         />
       </nav>
 

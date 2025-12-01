@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "food-map",
-      cwd: "/root/var/www/fe",                 // thư mục dự án (điều chỉnh đúng của bạn)
+      cwd: "/root/quang/fe",                 // thư mục dự án (điều chỉnh đúng của bạn)
       script: "node_modules/next/dist/bin/next",
       args: "start -p 3014",                   
       exec_mode: "fork",                       // Next.js thường dùng fork; cluster cần sticky

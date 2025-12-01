@@ -75,8 +75,8 @@ export default function RestaurantsPage() {
   // helper: chọn ảnh cover
   const getRestaurantImage = (r: Restaurant, index: number): string => {
     return (
-      r.coverImageUrlSigned ||
-      r.logoUrlSigned ||
+      r.coverImageUrl ||
+      r.logoUrl ||
       (r.gallerySigned && r.gallerySigned.length > 0
         ? r.gallerySigned[0]
         : "") ||
