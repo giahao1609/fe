@@ -1,15 +1,23 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+
 import BlogList from "@/components/blog/BlogList";
 import BlogSidebar from "@/components/blog/BlogSidebar";
-import { BlogService, type BlogPost, type PaginatedBlogs } from "@/services/blog.service";
+import {
+  BlogService,
+  type BlogPost,
+  type PaginatedBlogs,
+} from "@/services/blog.service";
 
 const PAGE_SIZE = 8;
 
 type Search = {
   page?: string;
   q?: string;
-  tag?: string;         // 1 tag (client có thể truyền nhiều, mình vẫn ưu tiên 1 param)
-  categories?: string;  // "blog,review"
+  tag?: string;
+  categories?: string;
 };
 
 function qs(params: Record<string, string | undefined>) {
@@ -24,52 +32,95 @@ function uniq<T>(arr: T[]) {
   return [...new Set(arr)];
 }
 
-export default async function BlogIndex({
-  searchParams,
-}: {
-  // Next 15: searchParams là Promise
-  searchParams?: Promise<Search>;
-}) {
-  const sp = (await searchParams) ?? {};
+export default function BlogIndex() {
+  // state giữ query từ URL
+  const [search, setSearch] = useState<Search>({});
+  const [data, setData] = useState<PaginatedBlogs | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const page = Math.max(1, Number(sp.page ?? 1));
-  const q = (sp.q ?? "").toString().trim();
-  const tag = (sp.tag ?? "").toString().trim();
-  const categories = (sp.categories ?? "").toString().trim();
+  // đọc query 1 lần khi mount (không dùng useSearchParams)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  // Gọi API: chỉ lấy bài đã xuất bản
-  let data: PaginatedBlogs | null = null;
-  try {
-    data = await BlogService.listMyBlogs({
-      page,
-      limit: PAGE_SIZE,
-      q: q || undefined,
-      tags: tag || undefined,           // backend: "tag1,tag2"
-      categories: categories || undefined,
-      status: "PUBLISHED",
+    const sp = new URLSearchParams(window.location.search);
+
+    setSearch({
+      page: sp.get("page") ?? undefined,
+      q: sp.get("q") ?? undefined,
+      tag: sp.get("tag") ?? undefined,
+      categories: sp.get("categories") ?? undefined,
     });
-  } catch (err) {
-    // Silent fallback (giữ data=null)
-    console.error("BlogIndex list error:", err);
-  }
+  }, []);
+
+  // derive từ state search
+  const page = Math.max(1, Number(search.page ?? 1) || 1);
+  const q = (search.q ?? "").toString().trim();
+  const tag = (search.tag ?? "").toString().trim();
+  const categories = (search.categories ?? "").toString().trim();
+
+  // call API
+  useEffect(() => {
+    let canceled = false;
+
+    const fetchBlogs = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await BlogService.listFullBlogs({
+          page,
+          limit: PAGE_SIZE,
+          q: q || undefined,
+          tags: tag || undefined,
+          categories: categories || undefined,
+        });
+
+        if (!canceled) {
+          setData(res);
+        }
+      } catch (err) {
+        console.error("BlogIndex list error:", err);
+        if (!canceled) {
+          setError("Không thể tải danh sách blog. Vui lòng thử lại sau.");
+        }
+      } finally {
+        if (!canceled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchBlogs();
+
+    return () => {
+      canceled = true;
+    };
+  }, [page, q, tag, categories]);
 
   const items: BlogPost[] = data?.items ?? [];
   const total = data?.total ?? 0;
   const maxPage = data?.pages ?? Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Sidebar: gom tag từ trang hiện tại (nếu muốn lấy tổng thể, tạo endpoint riêng)
-  const allTags = uniq(
-    items.flatMap((p) => Array.isArray(p.tags) ? p.tags : [])
-  ).slice(0, 12);
+  const allTags = useMemo(
+    () =>
+      uniq(
+        items.flatMap((p) => (Array.isArray(p.tags) ? p.tags : [])),
+      ).slice(0, 12),
+    [items],
+  );
 
-  // Popular: ưu tiên theo viewCount trong page hiện tại (nếu backend có endpoint popular thì thay ở đây)
-  const popular = items
-    .slice()
-    .sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0))
-    .slice(0, 5)
-    .map((p) => ({ title: p.title, slug: p.slug }));
+  // dùng id thay vì slug
+  const popular = useMemo(
+    () =>
+      items
+        .slice()
+        .sort((a, b) => (b.viewCount ?? 0) - (a.viewCount ?? 0))
+        .slice(0, 5)
+        .map((p) => ({ title: p.title, id: p._id })),
+    [items],
+  );
 
-  // Build query giữ nguyên filter khi phân trang
   const baseQuery = {
     ...(q ? { q } : undefined),
     ...(tag ? { tag } : undefined),
@@ -87,13 +138,16 @@ export default async function BlogIndex({
           Review quán, gợi ý món, mẹo đi FoodTour – cập nhật liên tục.
         </p>
 
-        {/* Khu filter (link nhanh với tag đang có) */}
         {allTags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {allTags.map((t) => (
               <Link
                 key={t}
-                href={`/categories/blog?${qs({ ...baseQuery, tag: t, page: "1" })}`}
+                href={`/categories/blog?${qs({
+                  ...baseQuery,
+                  tag: t,
+                  page: "1",
+                })}`}
                 className={`rounded-full border px-3 py-1 text-xs ${
                   t === tag
                     ? "border-rose-300 bg-rose-50 text-rose-700"
@@ -110,16 +164,26 @@ export default async function BlogIndex({
       <div className="grid gap-6 lg:grid-cols-12">
         {/* List */}
         <div className="lg:col-span-9">
+          {loading && (
+            <div className="mb-4 rounded-xl border border-gray-100 bg-white p-4 text-sm text-gray-600">
+              Đang tải bài viết...
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
           <BlogList posts={items} />
 
-          {/* Empty state */}
-          {!items.length && (
+          {!loading && !items.length && !error && (
             <div className="mt-6 rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
               Không tìm thấy bài viết phù hợp.
             </div>
           )}
 
-          {/* Pagination */}
           {maxPage > 1 && (
             <div className="mt-6 flex items-center justify-center gap-2">
               <Link
@@ -157,6 +221,7 @@ export default async function BlogIndex({
 
         {/* Sidebar */}
         <div className="lg:col-span-3">
+          {/* Nhớ sửa BlogSidebar để nhận { title, id } và link bằng id */}
           <BlogSidebar tags={allTags} popular={popular} />
         </div>
       </div>

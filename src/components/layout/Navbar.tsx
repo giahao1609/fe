@@ -71,6 +71,16 @@ export default function Navbar() {
     setOpen(false);
   };
 
+  const handleMyBlogClick = () => {
+    if (!user) {
+      router.push("/auth");
+      return;
+    }
+    router.push("/me/blogs");
+    setAccountMenuOpen(false);
+    setOpen(false);
+  };
+
   // đo chiều cao header để spacer cho mobile
   useEffect(() => {
     const el = headerRef.current;
@@ -128,13 +138,17 @@ export default function Navbar() {
     return (
       <Link
         href={href}
-        className={`group relative inline-flex items-center gap-1 px-1 py-1 text-[15px] font-medium transition-colors ${active ? "text-rose-700" : "text-gray-700 hover:text-rose-700"
-          }`}
+        className={`group relative inline-flex items-center gap-1 px-1 py-1 text-[15px] font-medium transition-colors ${
+          active
+            ? "text-rose-700"
+            : "text-gray-700 hover:text-rose-700"
+        }`}
       >
         <span>{label}</span>
         <span
-          className={`pointer-events-none absolute -bottom-0.5 left-1/2 h-[2px] w-0 -translate-x-1/2 rounded-full bg-rose-600 transition-all duration-300 ${active ? "w-6" : "group-hover:w-6"
-            }`}
+          className={`pointer-events-none absolute -bottom-0.5 left-1/2 h-[2px] w-0 -translate-x-1/2 rounded-full bg-rose-600 transition-all duration-300 ${
+            active ? "w-6" : "group-hover:w-6"
+          }`}
         />
       </Link>
     );
@@ -149,8 +163,9 @@ export default function Navbar() {
           // @ts-ignore
           "--nav-h": `${navH}px`,
         }}
-        className={`fixed top-0 left-0 z-50 w-full bg-white/80 backdrop-blur-md transition-shadow ${elevated ? "shadow-md" : "shadow-sm"
-          } lg:sticky`}
+        className={`fixed top-0 left-0 z-50 w-full bg-white/80 backdrop-blur-md transition-shadow ${
+          elevated ? "shadow-md" : "shadow-sm"
+        } lg:sticky`}
         role="banner"
       >
         <div className="h-[3px] w-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-400" />
@@ -242,6 +257,7 @@ export default function Navbar() {
                       </p>
                     </div>
                     <div className="my-1 h-px bg-gray-100" />
+
                     <button
                       onClick={handleAccountClick}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-800 hover:bg-gray-50"
@@ -249,22 +265,32 @@ export default function Navbar() {
                       <span className="text-[16px]">👤</span>
                       <span>Thông tin tài khoản</span>
                     </button>
+
                     <button
+                      onClick={handleMyBlogClick}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-800 hover:bg-gray-50"
+                    >
+                      <span className="text-[16px]">✍️</span>
+                      <span>Blog của tôi</span>
+                    </button>
+
+                    {/* <button
                       onClick={handleCreateRestaurantClick}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-rose-700 hover:bg-rose-50"
                     >
                       <span className="text-[16px]">➕</span>
                       <span>Đăng quán</span>
-                    </button>
-                    {
-                      (roles.includes("owner") ||  roles.includes("admin")) && <button
+                    </button> */}
+
+                    {(roles.includes("owner") || roles.includes("admin")) && (
+                      <button
                         onClick={handleDashboardClick}
                         className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-800 hover:bg-gray-50"
                       >
                         <span className="text-[16px]">📊</span>
                         <span>Dashboard</span>
                       </button>
-                    }
+                    )}
 
                     <div className="my-1 h-px bg-gray-100" />
                     <button
@@ -323,15 +349,17 @@ export default function Navbar() {
 
         {/* Mobile drawer */}
         <div
-          className={`lg:hidden fixed left-0 right-0 z-40 transition-[max-height,opacity] duration-250 ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
-            }`}
+          className={`lg:hidden fixed left-0 right-0 z-40 transition-[max-height,opacity] duration-250 ${
+            open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+          }`}
           style={{
             top: `calc(var(--nav-h) + env(safe-area-inset-top))`,
           }}
         >
           <div
-            className={`mx-4 mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur-sm ${open ? "max-h-[70vh]" : "max-h-0"
-              }`}
+            className={`mx-4 mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur-sm ${
+              open ? "max-h-[70vh]" : "max-h-0"
+            }`}
           >
             <div className="grid gap-2">
               {NAV_LINKS.map((item) => (
@@ -377,15 +405,24 @@ export default function Navbar() {
                   </button>
                 </div>
 
-                {/* Quản lý quán trong "dropdown" mobile */}
+                {/* Quản lý trong mobile */}
                 <div className="mt-3 grid gap-2 px-1">
                   <button
+                    onClick={handleMyBlogClick}
+                    className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
+                  >
+                    <span className="text-[16px]">✍️</span>
+                    <span>Blog của tôi</span>
+                  </button>
+
+                  {/* <button
                     onClick={handleCreateRestaurantClick}
                     className="flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
                   >
                     <span className="text-[16px]">➕</span>
                     <span>Đăng quán mới</span>
-                  </button>
+                  </button> */}
+
                   <button
                     onClick={() => {
                       handleDashboardClick();
@@ -396,6 +433,7 @@ export default function Navbar() {
                     <span className="text-[16px]">📊</span>
                     <span>Dashboard</span>
                   </button>
+
                   <button
                     onClick={() => {
                       logout();

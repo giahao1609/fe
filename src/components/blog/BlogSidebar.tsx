@@ -1,3 +1,4 @@
+// src/components/blog/BlogSidebar.tsx
 "use client";
 
 import Link from "next/link";
@@ -7,7 +8,7 @@ export default function BlogSidebar({
   popular,
 }: {
   tags: string[];
-  popular: { title: string; slug: string }[];
+  popular: { title: string; id: string }[];
 }) {
   return (
     <aside className="space-y-6">
@@ -30,9 +31,9 @@ export default function BlogSidebar({
         <h4 className="text-sm font-semibold text-gray-900">Đọc nhiều</h4>
         <ul className="mt-3 space-y-2 text-sm">
           {popular.map((p) => (
-            <li key={p.slug}>
+            <li key={p.id}>
               <Link
-                href={`/categories/blog/${p.slug}`}
+                href={`/categories/blog/${p.id}`}
                 className="line-clamp-2 text-gray-700 hover:text-rose-700"
               >
                 {p.title}
