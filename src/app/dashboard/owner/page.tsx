@@ -9,6 +9,7 @@ import RestaurantsTab from "@/components/owner/RestaurantsTab";
 import StoreSettings from "@/components/owner/StoreSettings";
 import OwnerBlogsTab from "@/components/owner/blogs/OwnerBlogsTab";
 import { useEffect, useState } from "react";
+import { OwnerPreOrder } from "@/components/owner-pre-order/OwnerPreOrder";
 
 export type OwnerTab =
   | "overview"
@@ -17,7 +18,8 @@ export type OwnerTab =
   | "posts"
   | "restaurants"
   | "menu"
-  | "blogs";
+  | "blogs"
+  | "order";
 
 export default function OwnerPage() {
   const [tab, setTab] = useState<OwnerTab>("overview");
@@ -35,6 +37,7 @@ export default function OwnerPage() {
         {tab === "restaurants" && <RestaurantsTab />}
         {tab === "menu" && <MenuItemsDemoTab />}
         {tab === "blogs" && <OwnerBlogsTab />}
+        {tab === "order" && <OwnerPreOrder />}
       </main>
     </div>
   );

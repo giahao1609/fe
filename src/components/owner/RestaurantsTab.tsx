@@ -112,7 +112,7 @@ export default function RestaurantsTab() {
   const mapRef = useRef<Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
 
-  const [createdRestaurant, setCreatedRestaurant] = useState<Restaurant | null>(null);
+  const [createdRestaurant, setCreatedRestaurant] = useState<any | null>(null);
 
   // ==== LOAD CATEGORY TREE ====
   const loadCategories = async () => {
@@ -393,7 +393,6 @@ export default function RestaurantsTab() {
     e.preventDefault();
     setError(null);
     setMsg(null);
-
     if (!name.trim()) return setError("Vui lòng nhập tên nhà hàng.");
     if (!categoryId.trim()) return setError("Vui lòng chọn danh mục món ăn.");
     if (!street.trim() || !ward.trim() || !district.trim() || !city.trim())
@@ -409,8 +408,9 @@ export default function RestaurantsTab() {
       closed: false,
       is24h: false,
     }));
+    console.log("mhmsmsmams")
 
-    const payload: CreateRestaurantPayload = {
+    const payload: any = {
       name: name.trim(),
       categoryId: categoryId.trim(),
       priceRange,
@@ -454,9 +454,12 @@ export default function RestaurantsTab() {
       bankQrs: bankQrFiles,
       ewalletQrs: ewalletQrFiles,
     };
+    console.log("mhmsmsmams", payload)
 
     setLoading(true);
     try {
+
+
       const created = await RestaurantService.createRestaurant(payload);
       setCreatedRestaurant(created);
       setMsg("✅ Đăng quán thành công! Quán mới của bạn đã được tạo.");

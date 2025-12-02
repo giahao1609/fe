@@ -1,41 +1,24 @@
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { PreOrderService } from "@/services/pre-order.service";
+"use client"
+import {  PreOrderMenuItem } from "@/app/(layout)/categories/restaurants/[id]/pre-order/page";
 import { NotifyService } from "@/services/notify.service";
-
-const isBrowser = typeof window !== "undefined";
-
-const cartStorageKey = (restaurantId: string) =>
-  `fm_cart_restaurant_${restaurantId}`;
-
-export type MenuItem = {
-  _id: string;
-  name: string;
-  description?: string;
-  price: number;
-  imageUrl?: string;
-};
-
-type CartItem = {
+import { PreOrderService } from "@/services/pre-order.service";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+export type CartItem = {
   menuItemId: string;
   name: string;
   price: number;
   quantity: number;
   note?: string;
 };
-
-interface RestaurantPreOrderSectionProps {
-  restaurantId: string;
-  restaurantName?: string;
-  menuItems: MenuItem[];
-}
-
+const isBrowser = typeof window !== "undefined";
+const cartStorageKey = (restaurantId: string) =>
+  `fm_cart_restaurant_${restaurantId}`;
 function loadCart(restaurantId: string): CartItem[] {
   if (!isBrowser) return [];
-  const raw = window.localStorage.getItem(cartStorageKey(restaurantId));
-  if (!raw) return [];
   try {
+    const raw = window.localStorage.getItem(cartStorageKey(restaurantId));
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return parsed;
   } catch {
@@ -48,12 +31,27 @@ function saveCart(restaurantId: string, cart: CartItem[]) {
   if (!isBrowser) return;
   window.localStorage.setItem(cartStorageKey(restaurantId), JSON.stringify(cart));
 }
+// ====== PRE-ORDER SECTION ======
+interface RestaurantPreOrderSectionProps {
+  restaurantId: string;
+  restaurantName?: string;
+  menuItems?: PreOrderMenuItem[];
+  loadingMenu: boolean;
+  isLoggedIn: boolean;
+}
 
-export default function RestaurantPreOrderSection({
+export function  RestaurantPreOrderSection({
   restaurantId,
   restaurantName,
-  menuItems,
+  menuItems: rawMenuItems,
+  loadingMenu,
+  isLoggedIn,
 }: RestaurantPreOrderSectionProps) {
+  // luôn là array, tránh undefined.length
+  const menuItems: PreOrderMenuItem[] = Array.isArray(rawMenuItems)
+    ? rawMenuItems
+    : [];
+
   const [cart, setCart] = useState<CartItem[]>([]);
   const [guestCount, setGuestCount] = useState(2);
   const [arrivalTime, setArrivalTime] = useState(""); // datetime-local
@@ -62,7 +60,7 @@ export default function RestaurantPreOrderSection({
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Load cart from localStorage
+  // Load cart từ localStorage
   useEffect(() => {
     const c = loadCart(restaurantId);
     setCart(c);
@@ -76,7 +74,7 @@ export default function RestaurantPreOrderSection({
     });
   };
 
-  const addItem = (item: MenuItem) => {
+  const addItem = (item: PreOrderMenuItem) => {
     updateCart((prev) => {
       const idx = prev.findIndex((c) => c.menuItemId === item._id);
       if (idx === -1) {
@@ -130,6 +128,12 @@ export default function RestaurantPreOrderSection({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isLoggedIn) {
+      NotifyService.warn("Vui lòng đăng nhập để đặt bàn trước.");
+      return;
+    }
+
     if (!cart.length) {
       NotifyService.warn("Giỏ món đang trống, hãy chọn ít nhất 1 món.");
       return;
@@ -147,7 +151,6 @@ export default function RestaurantPreOrderSection({
       return;
     }
 
-    // Convert datetime-local -> ISO
     const isoArrival = new Date(arrivalTime).toISOString();
 
     setSubmitting(true);
@@ -171,95 +174,135 @@ export default function RestaurantPreOrderSection({
       setNote("");
     } catch (err: any) {
       console.error(err);
-      NotifyService.error(err?.message || "Không gửi được yêu cầu đặt bàn.");
+      NotifyService.error(
+        err?.message || "Không gửi được yêu cầu đặt bàn.",
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 rounded-2xl bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-400 p-[1px]">
-        <div className="flex flex-col justify-between gap-3 rounded-2xl bg-white/90 px-4 py-4 md:flex-row md:items-center">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">
-              Đặt bàn trước {restaurantName ? `– ${restaurantName}` : ""}
-            </h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Chọn món, số khách và thời gian đến. Quán sẽ xác nhận lại cho bạn.
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1 text-xs text-gray-600">
-            <span className="rounded-full bg-rose-50 px-3 py-1 text-rose-700">
-              Không cần thanh toán trước · Thanh toán tại quán
-            </span>
-            <span>
-              Tổng món:{" "}
-              <span className="font-semibold text-gray-900">
-                {summary.totalItems}
-              </span>
-            </span>
+    <div className="space-y-5 md:space-y-6">
+      {/* cảnh báo login */}
+      {!isLoggedIn && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900 sm:text-sm">
+          <p className="font-medium">
+            Bạn cần đăng nhập để gửi yêu cầu đặt bàn.
+          </p>
+          <p className="mt-1 text-[11px] sm:text-xs">
+            Bạn vẫn có thể xem thực đơn và chuẩn bị sẵn chọn món. Khi đăng nhập
+            xong, giỏ món của bạn vẫn được giữ lại trên thiết bị này.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Link
+              href="/auth"
+              className="inline-flex items-center justify-center rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+            >
+              Đăng nhập ngay
+            </Link>
+            <Link
+              href="/auth"
+              className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
+            >
+              Tạo tài khoản mới
+            </Link>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Layout: menu + cart */}
       <div className="grid gap-5 md:grid-cols-[2fr,1.5fr]">
         {/* Menu list */}
         <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-800">
+            <h2 className="text-sm font-semibold text-gray-800 sm:text-base">
               Thực đơn gợi ý
             </h2>
-            <span className="text-xs text-gray-500">
-              Chạm vào nút <strong>+ Thêm</strong> để bỏ vào giỏ.
+            <span className="text-[11px] text-gray-500 sm:text-xs">
+              Chạm vào nút <strong>+ Thêm</strong> để bỏ món vào giỏ.
             </span>
           </div>
 
-          {menuItems.length === 0 && (
+          {loadingMenu && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-2 shadow-xs"
+                >
+                  <div className="h-16 w-16 rounded-xl bg-gray-100 animate-pulse" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-2/3 rounded bg-gray-100 animate-pulse" />
+                    <div className="h-3 w-full rounded bg-gray-100 animate-pulse" />
+                    <div className="h-3 w-1/3 rounded bg-gray-100 animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!loadingMenu && menuItems.length === 0 && (
             <p className="py-8 text-center text-sm text-gray-500">
               Quán chưa cập nhật thực đơn.
             </p>
           )}
 
-          <div className="space-y-3">
-            {menuItems.map((m) => (
-              <div
-                key={m._id}
-                className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-2 shadow-xs"
-              >
-                {m.imageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={m.imageUrl}
-                    alt={m.name}
-                    className="h-16 w-16 rounded-xl object-cover"
-                  />
-                )}
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900">
-                    {m.name}
-                  </p>
-                  {m.description && (
-                    <p className="text-xs text-gray-500 line-clamp-2">
-                      {m.description}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs font-semibold text-rose-600">
-                    {m.price.toLocaleString("vi-VN")}₫
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => addItem(m)}
-                  className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+          {!loadingMenu && menuItems.length > 0 && (
+            <div className="space-y-3">
+              {menuItems.map((m) => (
+                <div
+                  key={m._id}
+                  className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-2 shadow-xs"
                 >
-                  + Thêm
-                </button>
-              </div>
-            ))}
-          </div>
+                  {m.imageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={m.imageUrl}
+                      alt={m.name}
+                      className="h-16 w-16 rounded-xl object-cover"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900">
+                      {m.name}
+                    </p>
+                    {m.description && (
+                      <p className="line-clamp-2 text-xs text-gray-500">
+                        {m.description}
+                      </p>
+                    )}
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-500">
+                      {m.itemType && (
+                        <span className="rounded-full bg-gray-50 px-2 py-0.5">
+                          {m.itemType}
+                        </span>
+                      )}
+                      {Array.isArray(m.tags) &&
+                        m.tags.slice(0, 2).map((t) => (
+                          <span
+                            key={t}
+                            className="rounded-full bg-rose-50 px-2 py-0.5 text-rose-700"
+                          >
+                            #{t}
+                          </span>
+                        ))}
+                    </div>
+                    <p className="mt-1 text-xs font-semibold text-rose-600">
+                      {m.price.toLocaleString("vi-VN")}₫
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => addItem(m)}
+                    className="rounded-full bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+                  >
+                    + Thêm
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Cart + info */}
@@ -268,7 +311,7 @@ export default function RestaurantPreOrderSection({
             {/* Cart */}
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-800">
+                <h2 className="text-sm font-semibold text-gray-800 sm:text-base">
                   Giỏ món đã chọn
                 </h2>
                 {cart.length > 0 && (
@@ -297,7 +340,7 @@ export default function RestaurantPreOrderSection({
                         <p className="font-semibold text-gray-800">
                           {c.name}
                         </p>
-                        <span className="text-gray-600">
+                        <span className="text-gray-700">
                           {(c.price * c.quantity).toLocaleString("vi-VN")}₫
                         </span>
                       </div>
@@ -367,25 +410,25 @@ export default function RestaurantPreOrderSection({
             </div>
 
             {/* Info khách + thời gian */}
-            <div className="space-y-2 rounded-xl bg-gray-50 p-3 text-xs">
+            <div className="space-y-2 rounded-xl bg-gray-50 p-3 text-xs sm:text-sm">
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <label className="font-medium text-gray-700">
+                  <label className="text-xs font-medium text-gray-700 sm:text-sm">
                     Tên liên hệ *
                   </label>
                   <input
-                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-rose-300 focus:ring-1 focus:ring-rose-200"
+                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-rose-300 focus:ring-1 focus:ring-rose-200 sm:text-sm"
                     value={contactName}
                     onChange={(e) => setContactName(e.target.value)}
                     placeholder="VD: Nguyễn Văn A"
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-medium text-gray-700">
+                  <label className="text-xs font-medium text-gray-700 sm:text-sm">
                     Số điện thoại *
                   </label>
                   <input
-                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-rose-300 focus:ring-1 focus:ring-rose-200"
+                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-rose-300 focus:ring-1 focus:ring-rose-200 sm:text-sm"
                     value={contactPhone}
                     onChange={(e) => setContactPhone(e.target.value)}
                     placeholder="VD: 0909..."
@@ -395,24 +438,24 @@ export default function RestaurantPreOrderSection({
 
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <label className="font-medium text-gray-700">
+                  <label className="text-xs font-medium text-gray-700 sm:text-sm">
                     Số khách *
                   </label>
                   <input
                     type="number"
                     min={1}
-                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-rose-300 focus:ring-1 focus:ring-rose-200"
+                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-rose-300 focus:ring-1 focus:ring-rose-200 sm:text-sm"
                     value={guestCount}
                     onChange={(e) => setGuestCount(Number(e.target.value || 1))}
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="font-medium text-gray-700">
+                  <label className="text-xs font-medium text-gray-700 sm:text-sm">
                     Thời gian dự kiến đến *
                   </label>
                   <input
                     type="datetime-local"
-                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-rose-300 focus:ring-1 focus:ring-rose-200"
+                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-rose-300 focus:ring-1 focus:ring-rose-200 sm:text-sm"
                     value={arrivalTime}
                     onChange={(e) => setArrivalTime(e.target.value)}
                   />
@@ -420,12 +463,12 @@ export default function RestaurantPreOrderSection({
               </div>
 
               <div className="space-y-1">
-                <label className="font-medium text-gray-700">
+                <label className="text-xs font-medium text-gray-700 sm:text-sm">
                   Ghi chú thêm cho quán
                 </label>
                 <textarea
                   rows={2}
-                  className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-rose-300 focus:ring-1 focus:ring-rose-200"
+                  className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs outline-none focus:border-rose-300 focus:ring-1 focus:ring-rose-200 sm:text-sm"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="VD: Cho bàn gần cửa sổ, có ghế em bé..."
@@ -442,7 +485,11 @@ export default function RestaurantPreOrderSection({
                   : "bg-rose-600 hover:bg-rose-700"
               }`}
             >
-              {submitting ? "Đang gửi yêu cầu..." : "Gửi yêu cầu đặt bàn"}
+              {submitting
+                ? "Đang gửi yêu cầu..."
+                : isLoggedIn
+                ? "Gửi yêu cầu đặt bàn"
+                : "Đăng nhập để đặt bàn"}
             </button>
           </form>
         </section>

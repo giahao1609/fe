@@ -119,7 +119,7 @@ export const RestaurantService = {
    * POST /api/v1/owner/restaurants
    * Tạo nhà hàng mới (multipart/form-data)
    */
-  async createRestaurant(payload: CreateRestaurantPayload): Promise<Restaurant> {
+  async createRestaurant(payload: any): Promise<Restaurant> {
     const formData = new FormData();
 
     formData.append("name", payload.name.trim());
@@ -129,16 +129,38 @@ export const RestaurantService = {
     formData.append("address", JSON.stringify(payload.address));
     formData.append("openingHours", JSON.stringify(payload.openingHours));
 
+    // 👈 THIẾU CHỖ NÀY
+    if (payload.paymentConfig) {
+      formData.append("paymentConfig", JSON.stringify(payload.paymentConfig));
+    }
+
+    // file đơn
     if (payload.logo) formData.append("logo", payload.logo);
     if (payload.cover) formData.append("cover", payload.cover);
+
+    // gallery
     if (payload.gallery && payload.gallery.length > 0) {
       for (const file of payload.gallery) {
         formData.append("gallery", file);
       }
     }
 
+    // 👇 thêm bankQrs
+    if (payload.bankQrs && payload.bankQrs.length > 0) {
+      for (const file of payload.bankQrs) {
+        formData.append("bankQrs", file);
+      }
+    }
+
+    // 👇 thêm ewalletQrs
+    if (payload.ewalletQrs && payload.ewalletQrs.length > 0) {
+      for (const file of payload.ewalletQrs) {
+        formData.append("ewalletQrs", file);
+      }
+    }
+
     const restaurant = await ApiService.postFormData<Restaurant>(
-      "/owner/restaurants",
+      "/owner/restaurants",          // nhớ base URL có /api/v1 nếu backend đang dùng
       formData,
     );
 
@@ -146,9 +168,10 @@ export const RestaurantService = {
     return restaurant;
   },
 
+
   /**
    * GET /api/v1/owner/restaurants
-   * List nhà hàng của owner (có phân trang)
+   * List nhà hàng (có phân trang)
    */
   async listRestaurants(input?: {
     page?: number;
@@ -174,16 +197,21 @@ export const RestaurantService = {
   },
 
   /**
-   * GET /api/v1/owner/restaurants/detail/:id
-   * Lấy chi tiết 1 nhà hàng (bao gồm signed URL logo/cover/gallery)
-   *
-   * curl --location 'https://api.food-map.online/api/v1/owner/restaurants/detail/691f71667ddc4ff2de6cdeb4'
+   * GET /api/v1/owner/restaurants/get-by-owner
+   * Lấy danh sách nhà hàng của owner hiện tại
    */
-  // services/restaurant.service.ts
+  async getByOwner() {
+    const res = await ApiService.get("/owner/restaurants/get-by-owner");
+    return res;
+  },
 
+  /**
+   * GET /api/v1/owner/restaurants/detail/:idOrSlug
+   * Lấy chi tiết 1 nhà hàng (bao gồm signed URL logo/cover/gallery)
+   */
   async getRestaurantDetail(
     id: string,
-    opts?: { lat?: number | null; lng?: number | null }
+    opts?: { lat?: number | null; lng?: number | null },
   ): Promise<Restaurant> {
     if (!id) {
       throw new Error("Restaurant id is required");
@@ -199,19 +227,125 @@ export const RestaurantService = {
 
     const res = await ApiService.get<Restaurant>(
       `/owner/restaurants/detail/${id}`,
-      { params }
+      { params },
     );
 
     return res;
   },
 
+  /**
+   * ✅ ALIAS cho trang owner: dùng đúng tên mà component đang gọi
+   * GET /api/v1/owner/restaurants/detail/:idOrSlug
+   */
+  async getOwnerDetail(
+    idOrSlug: string,
+    opts?: { lat?: number | null; lng?: number | null },
+  ): Promise<Restaurant> {
+    return RestaurantService.getRestaurantDetail(idOrSlug, opts);
+  },
+
+  /**
+   * ✅ Update nhà hàng của owner
+   * POST /api/v1/owner/restaurants/:id  (multipart/form-data)
+   * Khớp với OwnerRestaurantsController.updateById
+   */
+  async updateOwnerRestaurant(
+    id: string,
+    payload: {
+      name: string;
+      categoryId?: string;
+      priceRange?: string;
+      address?: RestaurantAddress;
+      openingHours?: OpeningHour[];
+      phone?: string | null;
+      email?: string | null;
+      website?: string | null;
+      description?: string | null;
+      tags?: string[];
+      status?: string; // "draft" | "published" | "archived"
+      // nếu sau này ông muốn edit logo/cover/gallery thì thêm File vào đây
+      logo?: File | null;
+      cover?: File | null;
+      gallery?: File[];
+      // các flag removeLogo/removeCover/galleryMode/... nếu cần
+      removeLogo?: boolean;
+      removeCover?: boolean;
+      galleryMode?: "append" | "replace" | "remove";
+      galleryRemovePaths?: string[];
+      removeAllGallery?: boolean;
+    },
+  ): Promise<Restaurant> {
+    if (!id) throw new Error("Restaurant id is required");
+
+    const formData = new FormData();
+
+    // fields cơ bản
+    if (payload.name) formData.append("name", payload.name.trim());
+    if (payload.categoryId)
+      formData.append("categoryId", payload.categoryId.trim());
+    if (payload.priceRange)
+      formData.append("priceRange", payload.priceRange);
+
+    if (payload.status)
+      formData.append("status", payload.status);
+
+    if (payload.address)
+      formData.append("address", JSON.stringify(payload.address));
+
+    if (payload.openingHours)
+      formData.append("openingHours", JSON.stringify(payload.openingHours));
+
+    if (typeof payload.phone === "string")
+      formData.append("phone", payload.phone.trim());
+    if (typeof payload.email === "string")
+      formData.append("email", payload.email.trim());
+    if (typeof payload.website === "string")
+      formData.append("website", payload.website.trim());
+    if (typeof payload.description === "string")
+      formData.append("description", payload.description.trim());
+
+    if (Array.isArray(payload.tags))
+      formData.append("tags", JSON.stringify(payload.tags));
+
+    // logo / cover / gallery nếu sau này FE cho phép đổi
+    if (payload.logo instanceof File) {
+      formData.append("logo", payload.logo);
+    }
+    if (payload.cover instanceof File) {
+      formData.append("cover", payload.cover);
+    }
+    if (Array.isArray(payload.gallery) && payload.gallery.length > 0) {
+      for (const file of payload.gallery) {
+        formData.append("gallery", file);
+      }
+    }
+
+    // các flag cho BE xử lý media (match với controller options)
+    if (typeof payload.removeLogo === "boolean")
+      formData.append("removeLogo", String(payload.removeLogo));
+    if (typeof payload.removeCover === "boolean")
+      formData.append("removeCover", String(payload.removeCover));
+    if (payload.galleryMode)
+      formData.append("galleryMode", payload.galleryMode);
+    if (Array.isArray(payload.galleryRemovePaths))
+      formData.append(
+        "galleryRemovePaths",
+        JSON.stringify(payload.galleryRemovePaths),
+      );
+    if (typeof payload.removeAllGallery === "boolean")
+      formData.append("removeAllGallery", String(payload.removeAllGallery));
+
+    const restaurant = await ApiService.postFormData<Restaurant>(
+      `/owner/restaurants/${id}`,
+      formData,
+    );
+
+    NotifyService.success("Cập nhật nhà hàng thành công!");
+    return restaurant;
+  },
 
   /**
    * GET /api/v1/owner/restaurants/nearby
-   *  ?lat=10.77653
-   *  &lng=106.70098
-   *  &maxDistanceMeters=115000
-   *  &limit=10
    */
   async getNearbyRestaurants(input: {
     lat: number;
@@ -232,7 +366,6 @@ export const RestaurantService = {
     const rawLimit = Number(input.limit ?? 20);
     const limit = Math.min(999, Math.max(1, rawLimit));
 
-    // build query string thủ công để không bị ?params=[object Object]
     const qs = new URLSearchParams({
       lat: String(lat),
       lng: String(lng),
