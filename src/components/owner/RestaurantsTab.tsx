@@ -408,7 +408,7 @@ export default function RestaurantsTab() {
       closed: false,
       is24h: false,
     }));
-    console.log("mhmsmsmams")
+
 
     const payload: any = {
       name: name.trim(),

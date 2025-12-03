@@ -20,6 +20,7 @@ export default function AccountPage() {
 
   const [profileForm, setProfileForm] = useState({
     displayName: "",
+    username: "",
     phone: "",
   });
 
@@ -35,17 +36,18 @@ export default function AccountPage() {
   const API_BASE =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
+  // Sync data từ context user -> form
   useEffect(() => {
     if (!user || !token) return;
 
     setProfileForm((prev) => ({
       ...prev,
-      // ưu tiên displayName, fallback username/name
       displayName:
         (user as any).displayName ||
         (user as any).username ||
         (user as any).name ||
         "",
+      username: (user as any).username || "",
       phone: (user as any).phone || "",
     }));
 
@@ -70,7 +72,7 @@ export default function AccountPage() {
     }
   };
 
-  // Lưu thông tin cá nhân
+  // ===== Lưu thông tin cá nhân (displayName, username, phone, avatar) =====
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !token) return;
@@ -79,42 +81,22 @@ export default function AccountPage() {
     setProfileLoading(true);
 
     try {
-      let avatarUrl = avatarPreview;
-      const userId = (user as any)._id || (user as any).id;
+      const formData = new FormData();
 
-      // nếu có chọn ảnh mới → upload
+      formData.append("displayName", profileForm.displayName || "");
+      formData.append("username", profileForm.username || "");
+      formData.append("phone", profileForm.phone || "");
+
       if (avatarFile) {
-        const formData = new FormData();
-        formData.append("file", avatarFile);
-
-        const uploadRes = await axios.post(
-          `${API_BASE}/upload/user/${userId}`,
-          formData,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
-
-        avatarUrl = uploadRes.data.url;
+        formData.append("avatar", avatarFile);
       }
 
-      // update thông tin
-      await axios.patch(
-        `${API_BASE}/auth/update-me`,
-        {
-          displayName: profileForm.displayName,
-          phone: profileForm.phone,
-          avatarUrl,
+      await axios.patch(`${API_BASE}/users/me/profile`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
         },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      });
 
       setMessage("Cập nhật thông tin tài khoản thành công!");
       setMessageType("success");
@@ -131,7 +113,7 @@ export default function AccountPage() {
     }
   };
 
-  // Đổi mật khẩu
+  // ===== Đổi mật khẩu (PATCH /users/me/password) =====
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !token) return;
@@ -146,11 +128,12 @@ export default function AccountPage() {
     setPasswordLoading(true);
 
     try {
-      await axios.patch(
-        `${API_BASE}/auth/update-me`,
+      const res = await axios.patch(
+        `${API_BASE}/users/me/password`,
         {
           currentPassword: passwordForm.currentPassword,
           newPassword: passwordForm.newPassword,
+          confirmNewPassword: passwordForm.confirmPassword,
         },
         {
           headers: {
@@ -159,7 +142,7 @@ export default function AccountPage() {
         }
       );
 
-      setMessage("Đổi mật khẩu thành công!");
+      setMessage(res.data?.message || "Đổi mật khẩu thành công!");
       setMessageType("success");
       setPasswordForm({
         currentPassword: "",
@@ -167,8 +150,10 @@ export default function AccountPage() {
         confirmPassword: "",
       });
     } catch (err: any) {
+      console.error(err);
       setMessage(
-        err?.response?.data?.message || "Đổi mật khẩu thất bại, vui lòng thử lại!"
+        err?.response?.data?.message ||
+          "Đổi mật khẩu thất bại, vui lòng thử lại!"
       );
       setMessageType("error");
     } finally {
@@ -202,7 +187,7 @@ export default function AccountPage() {
           <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">
             Tài khoản của bạn
           </h1>
-          <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-sm text-gray-600">
             Quản lý thông tin cá nhân, avatar và mật khẩu cho tài khoản FoodTour.
           </p>
         </div>
@@ -270,6 +255,24 @@ export default function AccountPage() {
 
               <div>
                 <label className="text-xs font-medium text-gray-700">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={profileForm.username}
+                  onChange={(e) =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      username: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+                  placeholder="Tên tài khoản (a-z, 0-9, _ .)"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-gray-700">
                   Số điện thoại
                 </label>
                 <input
@@ -309,7 +312,8 @@ export default function AccountPage() {
               Đổi mật khẩu
             </h2>
             <p className="mt-1 text-xs text-gray-500">
-              Nên dùng mật khẩu dài, khó đoán và không dùng chung với dịch vụ khác.
+              Nên dùng mật khẩu dài, khó đoán và không dùng chung với dịch vụ
+              khác.
             </p>
 
             <form
