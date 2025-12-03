@@ -34,7 +34,7 @@ export default function AccountPage() {
   const [messageType, setMessageType] = useState<MessageType>("");
 
   const API_BASE =
-    process.env.API_BASE_URL || "http://localhost:3001";
+    process.env.API_BASE_URL || "https://api.food-map.online/api/v1";
 
   // Sync data từ context user -> form
   useEffect(() => {
