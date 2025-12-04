@@ -1,14 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
 import Image from "next/image";
 
 type MessageType = "success" | "error" | "";
 
+type MeType = {
+  _id: string;
+  displayName?: string;
+  username?: string;
+  email: string;
+  phone?: string;
+  avatarUrl?: string;
+  picture?: string;
+  roles?: string[];
+  [key: string]: any;
+};
+
 export default function AccountPage() {
   const { user, token, logout, reloadUser } = useAuth();
+
+  const [me, setMe] = useState<MeType | null>(null);
+  const [meLoading, setMeLoading] = useState(false);
 
   const [profileLoading, setProfileLoading] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
@@ -36,32 +51,47 @@ export default function AccountPage() {
   const API_BASE =
     process.env.API_BASE_URL || "https://api.food-map.online/api/v1";
 
-  // Sync data từ context user -> form
-  useEffect(() => {
-    if (!user || !token) return;
-
-    setProfileForm((prev) => ({
-      ...prev,
-      displayName:
-        (user as any).displayName ||
-        (user as any).username ||
-        (user as any).name ||
-        "",
-      username: (user as any).username || "",
-      phone: (user as any).phone || "",
-    }));
-
-    setAvatarPreview(
-      (user as any).avatarUrl ||
-        (user as any).picture ||
-        "/image/default-avatar.jpg"
-    );
-  }, [user, token]);
-
   const resetMessage = () => {
     setMessage("");
     setMessageType("");
   };
+
+  // ===== Fetch /users/me từ API =====
+  const fetchMe = useCallback(async () => {
+    if (!token) return;
+    try {
+      setMeLoading(true);
+      const res = await axios.get<MeType>(`${API_BASE}/users/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = res.data;
+      setMe(data);
+
+      setProfileForm({
+        displayName:
+          data.displayName || data.username || (data as any).name || "",
+        username: data.username || "",
+        phone: data.phone || "",
+      });
+
+      setAvatarPreview(
+        data.avatarUrl || data.picture || "/image/default-avatar.jpg"
+      );
+    } catch (error) {
+      console.error("Fetch /users/me error:", error);
+    } finally {
+      setMeLoading(false);
+    }
+  }, [API_BASE, token]);
+
+  useEffect(() => {
+    if (token) {
+      fetchMe();
+    }
+  }, [token, fetchMe]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     resetMessage();
@@ -75,7 +105,7 @@ export default function AccountPage() {
   // ===== Lưu thông tin cá nhân (displayName, username, phone, avatar) =====
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !token) return;
+    if (!token || !me) return;
 
     resetMessage();
     setProfileLoading(true);
@@ -101,6 +131,9 @@ export default function AccountPage() {
       setMessage("Cập nhật thông tin tài khoản thành công!");
       setMessageType("success");
       setAvatarFile(null);
+
+      // reload lại /users/me + context
+      await fetchMe();
       await reloadUser();
     } catch (err: any) {
       console.error(err);
@@ -116,7 +149,7 @@ export default function AccountPage() {
   // ===== Đổi mật khẩu (PATCH /users/me/password) =====
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !token) return;
+    if (!token || !me) return;
 
     resetMessage();
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -161,7 +194,7 @@ export default function AccountPage() {
     }
   };
 
-  if (!user) {
+  if (!token || meLoading || !me) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center bg-gradient-to-br from-rose-50 via-white to-amber-50">
         <p className="text-sm text-gray-600">Đang tải thông tin tài khoản…</p>
@@ -170,15 +203,15 @@ export default function AccountPage() {
   }
 
   const displayName =
-    (user as any).displayName ||
-    (user as any).username ||
-    (user as any).name ||
-    (user as any).email?.split("@")[0] ||
+    me.displayName ||
+    me.username ||
+    (me as any).name ||
+    me.email?.split("@")[0] ||
     "Người dùng";
 
-  const email = (user as any).email;
-  const phone = (user as any).phone;
-  const roles = ((user as any).roles || []) as string[];
+  const email = me.email;
+  const phone = me.phone;
+  const roles = (me.roles || []) as string[];
 
   return (
     <div className="min-h-screen bg-white py-10">
@@ -187,8 +220,9 @@ export default function AccountPage() {
           <h1 className="text-2xl font-extrabold tracking-tight text-gray-900">
             Tài khoản của bạn
           </h1>
-        <p className="mt-1 text-sm text-gray-600">
-            Quản lý thông tin cá nhân, avatar và mật khẩu cho tài khoản FoodTour.
+          <p className="mt-1 text-sm text-gray-600">
+            Quản lý thông tin cá nhân, avatar và mật khẩu cho tài khoản
+            FoodTour.
           </p>
         </div>
 
