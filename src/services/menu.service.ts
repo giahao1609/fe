@@ -11,12 +11,42 @@ export type CreateMenuItemPayload = {
   slug: string;
   description?: string;
   itemType: string;
+
   basePrice: MoneyInput;
+  compareAtPrice?: MoneyInput;
+  discountPercent?: number;
+
   tags: string[];
   cuisines: string[];
   isAvailable: boolean;
   sortIndex?: number;
+
   images?: File[];
+};
+
+export type UpdateMenuItemFlags = {
+  imagesMode?: "append" | "replace" | "remove";
+  removeAllImages?: boolean;
+  imagesRemovePaths?: string[];
+};
+
+export type UpdateMenuItemPayload = {
+  name: string;
+  slug: string;
+  description?: string;
+  itemType: string;
+
+  basePrice: MoneyInput;
+  compareAtPrice?: MoneyInput;
+  discountPercent?: number;
+
+  tags: string[];
+  cuisines: string[];
+  isAvailable: boolean;
+  sortIndex?: number;
+
+  images?: File[];
+  flags?: UpdateMenuItemFlags;
 };
 
 export type MenuItem = {
@@ -37,6 +67,11 @@ export type MenuItem = {
     currency: string;
     amount: number;
   };
+  compareAtPrice?: {
+    currency: string;
+    amount: number;
+  };
+  discountPercent?: number;
 
   variants: any[];
   optionGroups: any[];
@@ -67,6 +102,17 @@ export type MenuItemPageResponse = {
   items: MenuItem[];
 };
 
+// helper nhỏ để append Money dạng field lồng (không JSON.stringify)
+function appendMoney(
+  form: FormData,
+  fieldName: string, // "basePrice" / "compareAtPrice"
+  money?: MoneyInput,
+) {
+  if (!money) return;
+  form.append(`${fieldName}[currency]`, money.currency);
+  form.append(`${fieldName}[amount]`, String(money.amount));
+}
+
 export const MenuService = {
   /** Tạo menu-item cho 1 nhà hàng (multipart/form-data) */
   async createForRestaurant(
@@ -83,9 +129,14 @@ export const MenuService = {
     }
     form.append("itemType", payload.itemType);
 
-    // 🔥 nested basePrice đúng format NestJS DTO (không JSON.stringify)
-    form.append("basePrice[currency]", payload.basePrice.currency);
-    form.append("basePrice[amount]", String(payload.basePrice.amount));
+    // Money fields
+    appendMoney(form, "basePrice", payload.basePrice);
+    appendMoney(form, "compareAtPrice", payload.compareAtPrice);
+
+    // discountPercent (simple number)
+    if (typeof payload.discountPercent === "number") {
+      form.append("discountPercent", String(payload.discountPercent));
+    }
 
     // tags & cuisines: nhiều field trùng tên
     (payload.tags || []).forEach((t) => form.append("tags", t));
@@ -105,6 +156,72 @@ export const MenuService = {
     }
 
     const url = `/owner/restaurants/${restaurantId}/menu-items`;
+    const res = await ApiService.postFormData<MenuItem>(url, form);
+    return res;
+  },
+
+  /** Cập nhật 1 menu-item (multipart/form-data + flags ảnh) */
+  async updateForRestaurant(
+    restaurantId: string,
+    menuItemId: string,
+    payload: UpdateMenuItemPayload,
+  ): Promise<MenuItem> {
+    const form = new FormData();
+
+    // ---- scalar fields ----
+    form.append("name", payload.name);
+    form.append("slug", payload.slug);
+    if (payload.description) {
+      form.append("description", payload.description);
+    }
+    form.append("itemType", payload.itemType);
+
+    // Money fields
+    appendMoney(form, "basePrice", payload.basePrice);
+    appendMoney(form, "compareAtPrice", payload.compareAtPrice);
+
+    // discountPercent
+    if (typeof payload.discountPercent === "number") {
+      form.append("discountPercent", String(payload.discountPercent));
+    }
+
+    // tags & cuisines
+    (payload.tags || []).forEach((t) => form.append("tags", t));
+    (payload.cuisines || []).forEach((c) => form.append("cuisines", c));
+
+    // boolean & number
+    form.append("isAvailable", String(payload.isAvailable));
+    if (typeof payload.sortIndex === "number") {
+      form.append("sortIndex", String(payload.sortIndex));
+    }
+
+    // images mới upload
+    if (payload.images && payload.images.length > 0) {
+      payload.images.forEach((file) => {
+        form.append("images", file);
+      });
+    }
+
+    // flags ảnh
+    if (payload.flags) {
+      if (payload.flags.imagesMode) {
+        form.append("imagesMode", payload.flags.imagesMode);
+      }
+      if (typeof payload.flags.removeAllImages === "boolean") {
+        form.append("removeAllImages", String(payload.flags.removeAllImages));
+      }
+      if (
+        payload.flags.imagesRemovePaths &&
+        payload.flags.imagesRemovePaths.length > 0
+      ) {
+        // Nest parseJsonArray: nếu nhiều field cùng tên => string[]
+        payload.flags.imagesRemovePaths.forEach((p) =>
+          form.append("imagesRemovePaths", p),
+        );
+      }
+    }
+
+    const url = `/owner/restaurants/${restaurantId}/menu-items/${menuItemId}`;
     const res = await ApiService.postFormData<MenuItem>(url, form);
     return res;
   },

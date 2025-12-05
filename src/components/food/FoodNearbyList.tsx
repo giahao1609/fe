@@ -9,7 +9,7 @@ type Food = {
   rating?: number;
 };
 
-export default function FoodNearbyList({ foods }: { foods: Food[] }) {
+export default function FoodNearbyList({ foods }: { foods: any[] }) {
   return (
     <div className="-mx-4 overflow-x-auto px-4">
       <div className="flex gap-4">

@@ -168,7 +168,7 @@ export const RestaurantService = {
   //   return restaurant;
   // },
 
-async createRestaurant(payload: any) {
+  async createRestaurant(payload: any) {
     const formData = new FormData();
 
     // text fields
@@ -294,63 +294,63 @@ async createRestaurant(payload: any) {
    */
   async updateOwnerRestaurant(
     id: string,
-    payload: {
-      name: string;
-      categoryId?: string;
-      priceRange?: string;
-      address?: RestaurantAddress;
-      openingHours?: OpeningHour[];
-      phone?: string | null;
-      email?: string | null;
-      website?: string | null;
-      description?: string | null;
-      tags?: string[];
-      status?: string; // "draft" | "published" | "archived"
-      // nếu sau này ông muốn edit logo/cover/gallery thì thêm File vào đây
-      logo?: File | null;
-      cover?: File | null;
-      gallery?: File[];
-      // các flag removeLogo/removeCover/galleryMode/... nếu cần
-      removeLogo?: boolean;
-      removeCover?: boolean;
-      galleryMode?: "append" | "replace" | "remove";
-      galleryRemovePaths?: string[];
-      removeAllGallery?: boolean;
-    },
+    payload: any,
   ): Promise<Restaurant> {
     if (!id) throw new Error("Restaurant id is required");
 
     const formData = new FormData();
 
-    // fields cơ bản
-    if (payload.name) formData.append("name", payload.name.trim());
-    if (payload.categoryId)
-      formData.append("categoryId", payload.categoryId.trim());
-    if (payload.priceRange)
-      formData.append("priceRange", payload.priceRange);
+    const appendIfString = (key: string, value?: string | null) => {
+      if (typeof value === "string" && value.trim().length > 0) {
+        formData.append(key, value.trim());
+      }
+    };
 
-    if (payload.status)
-      formData.append("status", payload.status);
+    // ===== BASIC FIELDS =====
+    appendIfString("name", payload.name ?? null);
+    appendIfString("categoryId", payload.categoryId ?? null);
+    appendIfString("priceRange", payload.priceRange ?? null);
+    appendIfString("phone", payload.phone ?? null);
+    appendIfString("email", payload.email ?? null);
+    appendIfString("website", payload.website ?? null);
+    appendIfString("description", payload.description ?? null);
+    appendIfString("status", payload.status ?? null);
 
-    if (payload.address)
+    if (payload.address) {
       formData.append("address", JSON.stringify(payload.address));
+    }
 
-    if (payload.openingHours)
+    if (payload.openingHours) {
       formData.append("openingHours", JSON.stringify(payload.openingHours));
+    }
 
-    if (typeof payload.phone === "string")
-      formData.append("phone", payload.phone.trim());
-    if (typeof payload.email === "string")
-      formData.append("email", payload.email.trim());
-    if (typeof payload.website === "string")
-      formData.append("website", payload.website.trim());
-    if (typeof payload.description === "string")
-      formData.append("description", payload.description.trim());
-
-    if (Array.isArray(payload.tags))
+    if (Array.isArray(payload.tags)) {
       formData.append("tags", JSON.stringify(payload.tags));
+    }
 
-    // logo / cover / gallery nếu sau này FE cho phép đổi
+    // ===== PAYMENT CONFIG + QR =====
+    // BE: if ('paymentConfig' in dto) { ... }
+    if (payload.paymentConfig !== undefined) {
+      // JSON.stringify(null) -> "null" => BE sẽ parse ra null và unset paymentConfig
+      formData.append(
+        "paymentConfig",
+        JSON.stringify(payload.paymentConfig),
+      );
+    }
+
+    if (Array.isArray(payload.bankQrs) && payload.bankQrs.length > 0) {
+      for (const file of payload.bankQrs) {
+        formData.append("bankQrs", file);
+      }
+    }
+
+    if (Array.isArray(payload.ewalletQrs) && payload.ewalletQrs.length > 0) {
+      for (const file of payload.ewalletQrs) {
+        formData.append("ewalletQrs", file);
+      }
+    }
+
+    // ===== MEDIA: LOGO / COVER / GALLERY =====
     if (payload.logo instanceof File) {
       formData.append("logo", payload.logo);
     }
@@ -363,21 +363,27 @@ async createRestaurant(payload: any) {
       }
     }
 
-    // các flag cho BE xử lý media (match với controller options)
-    if (typeof payload.removeLogo === "boolean")
+    // ===== FLAGS MEDIA (match parseBool/parseJsonArray ở BE) =====
+    if (typeof payload.removeLogo === "boolean") {
       formData.append("removeLogo", String(payload.removeLogo));
-    if (typeof payload.removeCover === "boolean")
+    }
+    if (typeof payload.removeCover === "boolean") {
       formData.append("removeCover", String(payload.removeCover));
-    if (payload.galleryMode)
+    }
+    if (payload.galleryMode) {
       formData.append("galleryMode", payload.galleryMode);
-    if (Array.isArray(payload.galleryRemovePaths))
+    }
+    if (Array.isArray(payload.galleryRemovePaths)) {
       formData.append(
         "galleryRemovePaths",
         JSON.stringify(payload.galleryRemovePaths),
       );
-    if (typeof payload.removeAllGallery === "boolean")
+    }
+    if (typeof payload.removeAllGallery === "boolean") {
       formData.append("removeAllGallery", String(payload.removeAllGallery));
+    }
 
+    // ===== CALL API =====
     const restaurant = await ApiService.postFormData<Restaurant>(
       `/owner/restaurants/${id}`,
       formData,

@@ -26,14 +26,29 @@ interface FormState {
   slug: string;
   description: string;
   itemType: string;
+
+  // basePrice
   priceCurrency: string;
   priceAmount: string;
+
+  // compareAtPrice (giá gốc / trước KM)
+  compareAtPriceAmount: string;
+
+  // % giảm giá
+  discountPercent: string;
+
   tags: string; // nhập “drink, tea”
   cuisines: string; // nhập “vietnamese, korean”
   isAvailable: boolean;
   sortIndex: string;
+
+  // Ảnh mới upload
   images: File[];
   imagePreviews: string[];
+
+  // Ảnh hiện tại trên server (paths / URLs)
+  existingImages: string[];
+  removedExistingImages: string[];
 }
 
 const initialFormState: FormState = {
@@ -43,12 +58,16 @@ const initialFormState: FormState = {
   itemType: "drink",
   priceCurrency: "VND",
   priceAmount: "35000",
+  compareAtPriceAmount: "",
+  discountPercent: "",
   tags: "",
   cuisines: "",
   isAvailable: true,
   sortIndex: "",
   images: [],
   imagePreviews: [],
+  existingImages: [],
+  removedExistingImages: [],
 };
 
 export default function MenuItemsDemoTab() {
@@ -60,7 +79,7 @@ export default function MenuItemsDemoTab() {
     useState<string | null>(null);
 
   // ==== Menu items ====
-  const [items, setItems] = useState<MenuItem[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [itemsPage, setItemsPage] = useState<number>(1);
   const [itemsLimit] = useState<number>(20);
   const [itemsTotal, setItemsTotal] = useState<number>(0);
@@ -206,6 +225,16 @@ export default function MenuItemsDemoTab() {
     });
   };
 
+  const handleRemoveExistingImage = (path: string) => {
+    setForm((prev) => ({
+      ...prev,
+      existingImages: prev.existingImages.filter((p) => p !== path),
+      removedExistingImages: prev.removedExistingImages.includes(path)
+        ? prev.removedExistingImages
+        : [...prev.removedExistingImages, path],
+    }));
+  };
+
   const parseTags = (raw: string): string[] =>
     raw
       .split(",")
@@ -240,36 +269,77 @@ export default function MenuItemsDemoTab() {
       setError("Giá phải là số.");
       return;
     }
+    if (
+      form.compareAtPriceAmount.trim() &&
+      Number.isNaN(Number(form.compareAtPriceAmount))
+    ) {
+      setError("Giá gốc phải là số.");
+      return;
+    }
+    if (
+      form.discountPercent.trim() &&
+      Number.isNaN(Number(form.discountPercent))
+    ) {
+      setError("Phần trăm giảm giá phải là số.");
+      return;
+    }
 
-    const payload: CreateMenuItemPayload = {
+    const baseCurrency = form.priceCurrency.trim() || "VND";
+    const baseAmount = Number(form.priceAmount);
+
+    const compareAtAmount = form.compareAtPriceAmount.trim();
+    const discountPercentStr = form.discountPercent.trim();
+
+    const payloadBase: CreateMenuItemPayload = {
       name: form.name.trim(),
       slug: form.slug.trim(),
       description: form.description.trim() || undefined,
       itemType: form.itemType || "other",
       basePrice: {
-        currency: form.priceCurrency.trim() || "VND",
-        amount: Number(form.priceAmount),
+        currency: baseCurrency,
+        amount: baseAmount,
       },
+      // optional compareAtPrice
+      ...(compareAtAmount && {
+        compareAtPrice: {
+          currency: baseCurrency,
+          amount: Number(compareAtAmount),
+        },
+      }),
+      // optional discountPercent
+      ...(discountPercentStr && {
+        discountPercent: Number(discountPercentStr),
+      }),
       tags: parseTags(form.tags),
       cuisines: parseCuisines(form.cuisines),
       isAvailable: form.isAvailable,
       sortIndex: form.sortIndex.trim()
         ? Number(form.sortIndex.trim())
         : undefined,
-      images: form.images,
+      // variants, optionGroups, promotions... có thể thêm sau tuỳ nhu cầu
     };
 
     setLoadingSubmit(true);
     try {
       if (mode === "create" || !form.id) {
         // === TẠO MỚI ===
-        await MenuService.createForRestaurant(selectedRestaurantId, payload);
+        await MenuService.createForRestaurant(selectedRestaurantId, {
+          ...payloadBase,
+          images: form.images,
+        });
         NotifyService.success("Đã thêm món vào menu.");
       } else {
-        // === SỬA (tạm thời): xoá item cũ, tạo lại item mới ===
-        await MenuService.deleteForRestaurant(selectedRestaurantId, form.id);
-        await MenuService.createForRestaurant(selectedRestaurantId, payload);
-        NotifyService.success("Đã cập nhật món (xoá & tạo lại).");
+        // === SỬA ===
+        await MenuService.updateForRestaurant(selectedRestaurantId, form.id, {
+          ...payloadBase,
+          images: form.images,
+          flags: {
+            imagesMode: "append",
+            removeAllImages: false,
+            imagesRemovePaths: form.removedExistingImages,
+          },
+        });
+        NotifyService.success("Đã cập nhật món.");
       }
 
       resetForm();
@@ -292,7 +362,18 @@ export default function MenuItemsDemoTab() {
       description: item.description || "",
       itemType: item.itemType || "other",
       priceCurrency: item.basePrice?.currency || "VND",
-      priceAmount: String(item.basePrice?.amount ?? ""),
+      priceAmount:
+        item.basePrice && typeof item.basePrice.amount === "number"
+          ? String(item.basePrice.amount)
+          : "",
+      compareAtPriceAmount:
+        item.compareAtPrice && typeof item.compareAtPrice.amount === "number"
+          ? String(item.compareAtPrice.amount)
+          : "",
+      discountPercent:
+        typeof item.discountPercent === "number"
+          ? String(item.discountPercent)
+          : "",
       tags: (item.tags || []).join(", "),
       cuisines: (item.cuisines || []).join(", "),
       isAvailable: item.isAvailable ?? true,
@@ -300,6 +381,8 @@ export default function MenuItemsDemoTab() {
         typeof item.sortIndex === "number" ? String(item.sortIndex) : "",
       images: [],
       imagePreviews: [],
+      existingImages: item.images || [],
+      removedExistingImages: [],
     });
   };
 
@@ -323,14 +406,14 @@ export default function MenuItemsDemoTab() {
     }
   };
 
-  const filteredItems = items.filter((item) => {
+  const filteredItems = items.filter((item : any) => {
     if (!search.trim()) return true;
     const keyword = search.trim().toLowerCase();
     return (
       item.name.toLowerCase().includes(keyword) ||
       item.slug.toLowerCase().includes(keyword) ||
       (item.description || "").toLowerCase().includes(keyword) ||
-      (item.tags || []).some((t) => t.toLowerCase().includes(keyword))
+      (item.tags || []).some((t : any) => t.toLowerCase().includes(keyword))
     );
   });
 
@@ -559,89 +642,118 @@ export default function MenuItemsDemoTab() {
                 )}
 
                 {!loadingList &&
-                  filteredItems.map((item) => (
-                    <tr
-                      key={item._id}
-                      className="border-t border-gray-50 bg-white hover:bg-gray-50/80"
-                    >
-                      <td className="px-3 py-2 align-top">
-                        <div className="space-y-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-medium text-gray-900">
-                              {item.name}
-                            </span>
-                            {typeof item.sortIndex === "number" && (
-                              <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
-                                #{item.sortIndex}
+                  filteredItems.map((item) => {
+                    const baseAmount = item.basePrice?.amount ?? null;
+                    const baseCurrency =
+                      item.basePrice?.currency ||
+                      item.compareAtPrice?.currency ||
+                      "VND";
+                    const compareAmount = item.compareAtPrice?.amount ?? null;
+                    const hasCompare =
+                      typeof compareAmount === "number" &&
+                      compareAmount > (baseAmount ?? 0);
+
+                    return (
+                      <tr
+                        key={item._id}
+                        className="border-t border-gray-50 bg-white hover:bg-gray-50/80"
+                      >
+                        <td className="px-3 py-2 align-top">
+                          <div className="space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium text-gray-900">
+                                {item.name}
                               </span>
+                              {typeof item.sortIndex === "number" && (
+                                <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
+                                  #{item.sortIndex}
+                                </span>
+                              )}
+                            </div>
+                            <p className="font-mono text-[10px] text-gray-400">
+                              {item.slug}
+                            </p>
+                            {item.tags && item.tags.length > 0 && (
+                              <p className="text-[10px] text-gray-500">
+                                Tags: {item.tags.join(", ")}
+                              </p>
                             )}
                           </div>
-                          <p className="font-mono text-[10px] text-gray-400">
-                            {item.slug}
-                          </p>
-                          {item.tags && item.tags.length > 0 && (
-                            <p className="text-[10px] text-gray-500">
-                              Tags: {item.tags.join(", ")}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 align-top">
-                        <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] capitalize text-gray-700">
-                          {item.itemType || "other"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right align-top">
-                        <span className="font-mono text-[11px] text-gray-800">
-                          {item.basePrice?.amount?.toLocaleString?.("vi-VN") ??
-                            item.basePrice?.amount ??
-                            "-"}{" "}
-                          <span className="text-[10px] text-gray-500">
-                            {item.basePrice?.currency || "VND"}
+                        </td>
+                        <td className="px-3 py-2 align-top">
+                          <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-[10px] capitalize text-gray-700">
+                            {item.itemType || "other"}
                           </span>
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-center align-top">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                            item.isAvailable
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-gray-100 text-gray-500"
-                          }`}
-                        >
+                        </td>
+                        <td className="px-3 py-2 text-right align-top">
+                          <div className="flex flex-col items-end gap-0.5">
+                            {hasCompare && (
+                              <span className="font-mono text-[10px] text-gray-400 line-through">
+                                {compareAmount?.toLocaleString?.("vi-VN") ??
+                                  compareAmount}{" "}
+                                <span className="text-[9px]">
+                                  {baseCurrency}
+                                </span>
+                              </span>
+                            )}
+                            <span className="font-mono text-[11px] text-gray-900">
+                              {baseAmount?.toLocaleString?.("vi-VN") ??
+                                baseAmount ??
+                                "-"}{" "}
+                              <span className="text-[10px] text-gray-500">
+                                {baseCurrency}
+                              </span>
+                            </span>
+                            {typeof item.discountPercent === "number" &&
+                              item.discountPercent > 0 && (
+                                <span className="text-[10px] text-emerald-600">
+                                  -{item.discountPercent}%
+                                </span>
+                              )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 text-center align-top">
                           <span
-                            className={`mr-1 h-1.5 w-1.5 rounded-full ${
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
                               item.isAvailable
-                                ? "bg-emerald-500"
-                                : "bg-gray-400"
+                                ? "bg-emerald-50 text-emerald-700"
+                                : "bg-gray-100 text-gray-500"
                             }`}
-                          />
-                          {item.isAvailable ? "Đang bán" : "Tạm ngưng"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right align-top">
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(item)}
-                            className="rounded-full border border-blue-100 px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:border-blue-300 hover:bg-blue-50"
                           >
-                            ✏️ Sửa
-                          </button>
-                          <button
-                            type="button"
-                            disabled={loadingDeleteId === item._id}
-                            onClick={() => handleDelete(item)}
-                            className="rounded-full border border-rose-100 px-2.5 py-1 text-[11px] font-medium text-rose-700 hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {loadingDeleteId === item._id
-                              ? "Đang xoá..."
-                              : "🗑 Xoá"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            <span
+                              className={`mr-1 h-1.5 w-1.5 rounded-full ${
+                                item.isAvailable
+                                  ? "bg-emerald-500"
+                                  : "bg-gray-400"
+                              }`}
+                            />
+                            {item.isAvailable ? "Đang bán" : "Tạm ngưng"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right align-top">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(item)}
+                              className="rounded-full border border-blue-100 px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+                            >
+                              ✏️ Sửa
+                            </button>
+                            <button
+                              type="button"
+                              disabled={loadingDeleteId === item._id}
+                              onClick={() => handleDelete(item)}
+                              className="rounded-full border border-rose-100 px-2.5 py-1 text-[11px] font-medium text-rose-700 hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {loadingDeleteId === item._id
+                                ? "Đang xoá..."
+                                : "🗑 Xoá"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
@@ -765,7 +877,7 @@ export default function MenuItemsDemoTab() {
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">
-                  Giá cơ bản
+                  Giá đang bán (basePrice)
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -782,6 +894,40 @@ export default function MenuItemsDemoTab() {
                     disabled={!selectedRestaurantId}
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* compareAtPrice + discountPercent */}
+            <div className="grid gap-3 sm:grid-cols-[1.3fr,0.7fr]">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-700">
+                  Giá gốc / trước khuyến mãi (compareAtPrice)
+                </label>
+                <input
+                  value={form.compareAtPriceAmount}
+                  onChange={handleChange("compareAtPriceAmount")}
+                  placeholder="Ví dụ: 45000"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  disabled={!selectedRestaurantId}
+                />
+                <p className="text-[10px] text-gray-400">
+                  Để trống nếu không có giá gốc (sẽ không hiển thị gạch ngang).
+                </p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-700">
+                  Giảm giá (%) đơn giản
+                </label>
+                <input
+                  value={form.discountPercent}
+                  onChange={handleChange("discountPercent")}
+                  placeholder="Ví dụ: 20"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                  disabled={!selectedRestaurantId}
+                />
+                <p className="text-[10px] text-gray-400">
+                  Tùy chọn, dùng để hiển thị badge -20%.
+                </p>
               </div>
             </div>
 
@@ -875,10 +1021,41 @@ export default function MenuItemsDemoTab() {
                 Ảnh món (có thể chọn nhiều)
               </label>
               <div className="space-y-2">
+                {/* Ảnh hiện tại (từ server) */}
+                {form.existingImages.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-gray-500">
+                      Ảnh hiện tại (click ✕ để xoá ảnh này khi lưu):
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {form.existingImages.map((path) => (
+                        <div
+                          key={path}
+                          className="relative h-20 overflow-hidden rounded-lg border border-gray-100 bg-gray-100"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={path}
+                            alt={path}
+                            className="h-full w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveExistingImage(path)}
+                            className="absolute right-1 top-1 rounded-full bg-black/60 px-1.5 text-[10px] text-white hover:bg-black/80"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-gray-50 px-3 py-1.5 text-xs text-gray-700 hover:border-blue-300 hover:bg-blue-50">
                     <span>📷</span>
-                    <span>Chọn ảnh</span>
+                    <span>Chọn ảnh mới</span>
                     <input
                       type="file"
                       multiple
@@ -890,16 +1067,17 @@ export default function MenuItemsDemoTab() {
                   </label>
                   {form.images.length > 0 && (
                     <span className="text-[11px] text-emerald-600">
-                      Đã chọn {form.images.length} ảnh.
+                      Đã chọn {form.images.length} ảnh mới.
                     </span>
                   )}
                 </div>
 
+                {/* Preview ảnh mới */}
                 {form.imagePreviews.length > 0 && (
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                     {form.imagePreviews.map((src, idx) => (
                       <div
-                        key={idx}
+                        key={src}
                         className="relative h-20 overflow-hidden rounded-lg border border-gray-100 bg-gray-100"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -945,7 +1123,7 @@ export default function MenuItemsDemoTab() {
                   ? "Đang lưu..."
                   : mode === "create"
                   ? "Thêm món vào menu"
-                  : "Lưu thay đổi (xoá & tạo lại)"}
+                  : "Lưu thay đổi"}
               </button>
             </div>
           </form>

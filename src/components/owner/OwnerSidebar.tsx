@@ -59,11 +59,11 @@ export default function OwnerSidebar({
           label="Bài viết liên quan"
           icon={<i className="fa-regular fa-newspaper" />}
         /> */}
-        <Item
+        {/* <Item
           id="restaurants"
           label="Đăng quán / Nhà hàng"
           icon={<i className="fa-solid fa-utensils" />}
-        />
+        /> */}
         <Item
           id="menu"
           label="Menu"

@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 const NAV_LINKS = [
   { href: "/categories/nearby", label: "Gần bạn" },
   { href: "/categories/restaurants", label: "Quán ăn" },
+  { href: "/categories/deals", label: "Món ăn" },
   { href: "/categories/blog", label: "Blog" },
 ];
 
@@ -139,9 +140,7 @@ export default function Navbar() {
       <Link
         href={href}
         className={`group relative inline-flex items-center gap-1 px-1 py-1 text-[15px] font-medium transition-colors ${
-          active
-            ? "text-rose-700"
-            : "text-gray-700 hover:text-rose-700"
+          active ? "text-rose-700" : "text-gray-700 hover:text-rose-700"
         }`}
       >
         <span>{label}</span>
@@ -215,7 +214,10 @@ export default function Navbar() {
             </button>
 
             {user ? (
-              <div className="relative flex items-center gap-2" ref={accountRef}>
+              <div
+                className="relative flex items-center gap-2"
+                ref={accountRef}
+              >
                 {/* Greeting text */}
                 <button
                   onClick={handleAccountClick}
@@ -223,9 +225,7 @@ export default function Navbar() {
                   title={displayName || (user as any)?.email}
                 >
                   Xin chào,{" "}
-                  {displayName ||
-                    (user as any)?.email?.split("@")[0] ||
-                    "bạn"}
+                  {displayName || (user as any)?.email?.split("@")[0] || "bạn"}
                 </button>
 
                 {/* Avatar + dropdown trigger */}
@@ -350,7 +350,9 @@ export default function Navbar() {
         {/* Mobile drawer */}
         <div
           className={`lg:hidden fixed left-0 right-0 z-40 transition-[max-height,opacity] duration-250 ${
-            open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+            open
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none opacity-0"
           }`}
           style={{
             top: `calc(var(--nav-h) + env(safe-area-inset-top))`,
