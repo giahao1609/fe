@@ -43,7 +43,7 @@ export default function FoodNearbyList({ foods }: { foods: any[] }) {
               <div className="mt-2 flex items-center justify-between">
                 <div className="text-sm">
                   <span className="font-semibold text-rose-700">
-                    {f.price.toLocaleString()}đ
+                    {f?.price?.toLocaleString()}đ
                   </span>
                 </div>
                 <button className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 hover:border-rose-300 hover:text-rose-700">
