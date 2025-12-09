@@ -6,7 +6,7 @@ import HeaderBar from "@/components/admin/layout/HeaderBar";
 import DashboardContent from "@/components/admin/layout/DashboardContent";
 
 import RestaurantListTab from "@/components/admin/restaurants/RestaurantListTab";
-import RestaurantFormTab from "@/components/admin/restaurants/RestaurantFormTab";
+// import RestaurantFormTab from "@/components/admin/restaurants/RestaurantFormTab";
 import FilesTab from "@/components/admin/chatbot/FilesTab";
 import HistoryTab from "@/components/admin/chatbot/HistoryTab";
 
@@ -46,14 +46,14 @@ export default function AdminPage() {
           {/* RESTAURANTS */}
           {activeTab === "restaurants-list" && (
             <RestaurantListTab
-              onEdit={(restaurant) => {
-                setEditingRestaurant(restaurant);
-                setActiveTab("restaurants-form");
-              }}
+              // onView={(restaurant) => {
+              //   setEditingRestaurant(restaurant);
+              //   setActiveTab("restaurants-form");
+              // }}
             />
           )}
 
-          {activeTab === "restaurants-form" && (
+          {/* {activeTab === "restaurants-form" && (
             <RestaurantFormTab
               editing={editingRestaurant}
               onDone={() => {
@@ -61,7 +61,7 @@ export default function AdminPage() {
                 setActiveTab("restaurants-list");
               }}
             />
-          )}
+          )} */}
 
           {/* CATEGORIES */}
           {activeTab === "categories-list" && (

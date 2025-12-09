@@ -1,16 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Bell,
-  Search,
-  ChevronDown,
-  ChevronUp,
-  PlusCircle,
-} from "lucide-react";
+import { Bell, Search, ChevronDown, ChevronUp, PlusCircle } from "lucide-react";
 
 import RestaurantListTab from "./restaurants/RestaurantListTab";
-import RestaurantFormTab from "./restaurants/RestaurantFormTab";
+// import RestaurantFormTab from "./restaurants/RestaurantFormTab";
 import FilesTab from "./chatbot/FilesTab";
 import HistoryTab from "./chatbot/HistoryTab";
 import AdminUploadPage from "./upload/page";
@@ -74,15 +68,15 @@ export default function AdminDashboardPage() {
               active={activeTab === "restaurants-list"}
               onClick={() => setActiveTab("restaurants-list")}
             />
-            <SubNavButton
+            {/* <SubNavButton
               label=" Thêm / Sửa Nhà hàng"
               active={activeTab === "restaurants-form"}
               onClick={() => setActiveTab("restaurants-form")}
-            />
+            /> */}
           </DropdownGroup>
 
           {/* Chatbot */}
-          <DropdownGroup
+          {/* <DropdownGroup
             label="Chatbot AI"
             icon={<i className="fa-solid fa-robot"></i>}
             isOpen={openDropdown === "chatbot"}
@@ -98,10 +92,10 @@ export default function AdminDashboardPage() {
               active={activeTab === "chatbot-history"}
               onClick={() => setActiveTab("chatbot-history")}
             />
-          </DropdownGroup>
+          </DropdownGroup> */}
 
           {/* Upload ảnh website */}
-          <DropdownGroup
+          {/* <DropdownGroup
             label="Upload"
             icon={<i className="fa-regular fa-image"></i>}
             isOpen={openDropdown === "media"}
@@ -112,13 +106,13 @@ export default function AdminDashboardPage() {
               active={activeTab === "upload-images"}
               onClick={() => setActiveTab("upload-images")}
             />
-          </DropdownGroup>
+          </DropdownGroup> */}
 
-          <NavButton
+          {/* <NavButton
             icon={<i className="fa-solid fa-gear"></i>}
             label="Cài đặt"
             onClick={() => alert("Chức năng sắp có!")}
-          />
+          /> */}
         </nav>
 
         <div className="p-4 text-xs text-blue-100 border-t border-blue-800">
@@ -158,7 +152,7 @@ export default function AdminDashboardPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold text-[#0d47a1]">
-                   Danh sách Nhà hàng
+                  Danh sách Nhà hàng
                 </h1>
                 <button
                   onClick={() => setActiveTab("restaurants-form")}
@@ -169,7 +163,7 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
               <RestaurantListTab
-                onEdit={() => setActiveTab("restaurants-form")}
+                // onEdit={() => setActiveTab("restaurants-form")}
               />
             </div>
           )}
@@ -179,16 +173,16 @@ export default function AdminDashboardPage() {
               <h1 className="text-2xl font-bold text-[#0d47a1]">
                 ➕ Thêm / Sửa Nhà hàng
               </h1>
-              <RestaurantFormTab
+              {/* <RestaurantFormTab
                 onDone={() => setActiveTab("restaurants-list")}
-              />
+              /> */}
             </div>
           )}
 
           {activeTab === "chatbot-files" && (
             <div>
               <h1 className="text-2xl font-bold text-[#0d47a1] mb-4">
-                 Quản lý File tri thức
+                Quản lý File tri thức
               </h1>
               <FilesTab />
             </div>
@@ -197,7 +191,7 @@ export default function AdminDashboardPage() {
           {activeTab === "chatbot-history" && (
             <div>
               <h1 className="text-2xl font-bold text-[#0d47a1] mb-4">
-                 Lịch sử Chatbot
+                Lịch sử Chatbot
               </h1>
               <HistoryTab />
             </div>
@@ -206,7 +200,7 @@ export default function AdminDashboardPage() {
           {activeTab === "upload-images" && (
             <div>
               <h1 className="text-2xl font-bold text-[#0d47a1] mb-4">
-                 Upload & Quản lý Ảnh Website
+                Upload & Quản lý Ảnh Website
               </h1>
               <AdminUploadPage />
             </div>
@@ -353,8 +347,8 @@ function DashboardContent() {
           color="from-emerald-400 to-emerald-600"
         />
         <SoftCard
-          icon={<i className="fa-solid fa-robot"></i>}
-          title="File Chatbot"
+          icon={<i className="fa-solid fa-blog"></i>}
+          title="Blog"
           value="22"
           color="from-cyan-400 to-cyan-600"
         />

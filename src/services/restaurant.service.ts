@@ -168,50 +168,60 @@ export const RestaurantService = {
   //   return restaurant;
   // },
 
-  async createRestaurant(payload: any) {
-    const formData = new FormData();
+async createRestaurant(payload: any) {
+  const formData = new FormData();
 
-    // text fields
-    formData.append("name", payload.name.trim());
-    formData.append("categoryId", payload.categoryId.trim());
-    formData.append("priceRange", String(payload.priceRange));
+  // text fields
+  formData.append("name", payload.name.trim());
+  formData.append("categoryId", payload.categoryId.trim());
+  formData.append("priceRange", String(payload.priceRange));
 
-    // JSON fields – mirror với curl
-    formData.append("address", JSON.stringify(payload.address));
-    formData.append("openingHours", JSON.stringify(payload.openingHours));
-    formData.append("paymentConfig", JSON.stringify(payload.paymentConfig));
+  // JSON fields – mirror với curl
+  formData.append("address", JSON.stringify(payload.address));
+  formData.append("openingHours", JSON.stringify(payload.openingHours));
+  formData.append("paymentConfig", JSON.stringify(payload.paymentConfig));
 
-    // single file
-    if (payload.logo) formData.append("logo", payload.logo);
-    if (payload.cover) formData.append("cover", payload.cover);
+  // single file
+  if (payload.logo) formData.append("logo", payload.logo);
+  if (payload.cover) formData.append("cover", payload.cover);
 
-    // gallery
-    if (payload.gallery && payload.gallery.length > 0) {
-      for (const file of payload.gallery) {
-        formData.append("gallery", file);
-      }
+  // gallery
+  if (payload.gallery && payload.gallery.length > 0) {
+    for (const file of payload.gallery) {
+      formData.append("gallery", file);
     }
+  }
 
-    // bankQrs
-    if (payload.bankQrs && payload.bankQrs.length > 0) {
-      for (const file of payload.bankQrs) {
-        formData.append("bankQrs", file);
-      }
+  // bankQrs
+  if (payload.bankQrs && payload.bankQrs.length > 0) {
+    for (const file of payload.bankQrs) {
+      formData.append("bankQrs", file);
     }
+  }
 
-    // ewalletQrs
-    if (payload.ewalletQrs && payload.ewalletQrs.length > 0) {
-      for (const file of payload.ewalletQrs) {
-        formData.append("ewalletQrs", file);
-      }
+  // ewalletQrs
+  if (payload.ewalletQrs && payload.ewalletQrs.length > 0) {
+    for (const file of payload.ewalletQrs) {
+      formData.append("ewalletQrs", file);
     }
+  }
 
-    // Debug nếu cần so formData với curl
-    // console.log("FD entries:", Array.from(formData.entries()));
+  // 👇 Debug: xem FE thực sự append những gì
+  console.log(
+    "FormData entries:",
+    Array.from(formData.entries()).map(([k, v]) => [
+      k,
+      v instanceof File ? `${v.name} (${v.size} bytes)` : v,
+    ]),
+  );
 
-    const restaurant = await ApiService.postFormData<Restaurant>("/owner/restaurants", formData);
-    return restaurant;
-  },
+  const restaurant = await ApiService.postFormData<Restaurant>(
+    "/owner/restaurants",
+    formData,
+  );
+  return restaurant;
+},
+
   /**
    * GET /api/v1/owner/restaurants
    * List nhà hàng (có phân trang)

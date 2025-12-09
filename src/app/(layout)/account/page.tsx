@@ -121,7 +121,7 @@ export default function AccountPage() {
         formData.append("avatar", avatarFile);
       }
 
-      await axios.patch(`${API_BASE}/users/me/profile`, formData, {
+      await axios.post(`${API_BASE}/users/me/profile`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",
@@ -161,7 +161,7 @@ export default function AccountPage() {
     setPasswordLoading(true);
 
     try {
-      const res = await axios.patch(
+      const res = await axios.post(
         `${API_BASE}/users/me/password`,
         {
           currentPassword: passwordForm.currentPassword,

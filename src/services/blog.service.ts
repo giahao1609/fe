@@ -339,7 +339,7 @@ export const BlogService = {
   async listFullBlogs(
     rawQuery?: BlogQuery,
     jwt?: string,
-  ): Promise<PaginatedBlogs> {
+  ) {
     const params: Record<string, string> = {};
 
     if (rawQuery) {
@@ -381,4 +381,34 @@ export const BlogService = {
       buildAuthOptions(jwt),
     );
   },
+
+  async updatePublishStatus(
+    id: string,
+    published: boolean,
+    jwt?: string,
+  ) {
+    const body = { published };
+
+    // nếu ApiService có patch thì dùng patch cũng được
+    const raw = await ApiService.put<BlogPost>(
+      `${BASE_PATH}/${id}/status`,
+      body,
+      buildAuthOptions(jwt),
+    );
+
+    return raw;
+  },
+
+  async updateHiddenStatus(
+    id: string,
+    isHidden: boolean,
+    jwt?: string,
+  ) {
+    return ApiService.post<BlogPost>(
+      `${BASE_PATH}/${id}/hidden`,
+      { isHidden },
+      buildAuthOptions(jwt),
+    );
+  },
 };
+

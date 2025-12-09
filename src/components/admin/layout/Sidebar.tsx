@@ -87,11 +87,11 @@ export default function Sidebar({
             active={activeTab === "restaurants-list"}
             onClick={() => setActiveTab("restaurants-list")}
           />
-          <SubNavButton
+          {/* <SubNavButton
             label="➕ Thêm / Sửa Nhà hàng"
             active={activeTab === "restaurants-form"}
             onClick={() => setActiveTab("restaurants-form")}
-          />
+          /> */}
         </DropdownGroup>
 
         <DropdownGroup
@@ -138,23 +138,23 @@ export default function Sidebar({
             active={activeTab === "blog-list"}
             onClick={() => setActiveTab("blog-list")}
           />
-          <SubNavButton
+          {/* <SubNavButton
             label="➕ Thêm / Sửa bài viết"
             active={activeTab === "blog-form"}
             onClick={() => setActiveTab("blog-form")}
-          />
+          /> */}
         </DropdownGroup>
 
         {/* COMMENTS moderation */}
         <NavButton
           icon={<i className="fa-regular fa-comments"></i>}
-          label="Duyệt bình luận"
+          label="Bình luận"
           active={activeTab === "comments"}
           onClick={() => setActiveTab("comments")}
         />
 
         {/* CHATBOT */}
-        <DropdownGroup
+        {/* <DropdownGroup
           label="Chatbot AI"
           icon={<i className="fa-solid fa-robot"></i>}
           isOpen={openDropdown === "chatbot"}
@@ -170,10 +170,10 @@ export default function Sidebar({
             active={activeTab === "chatbot-history"}
             onClick={() => setActiveTab("chatbot-history")}
           />
-        </DropdownGroup>
+        </DropdownGroup> */}
 
         {/* UPLOAD MEDIA */}
-        <DropdownGroup
+        {/* <DropdownGroup
           label="Upload"
           icon={<i className="fa-regular fa-image"></i>}
           isOpen={openDropdown === "media"}
@@ -184,14 +184,14 @@ export default function Sidebar({
             active={activeTab === "upload-images"}
             onClick={() => setActiveTab("upload-images")}
           />
-        </DropdownGroup>
+        </DropdownGroup> */}
 
         {/* SETTINGS */}
-        <NavButton
+        {/* <NavButton
           icon={<i className="fa-solid fa-gear"></i>}
           label="Cài đặt"
           onClick={() => alert("⚙️ Chức năng này đang được phát triển!")}
-        />
+        /> */}
       </nav>
 
       <div className="p-4 text-xs text-blue-100 border-t border-blue-800">

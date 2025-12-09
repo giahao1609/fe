@@ -17,7 +17,7 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-
+  console.log("user", user)
   const [open, setOpen] = useState(false);
   const [elevated, setElevated] = useState(false);
   const [navH, setNavH] = useState(76);
@@ -44,6 +44,15 @@ export default function Navbar() {
     router.push(user ? "/account" : "/auth");
     setOpen(false);
     setAccountMenuOpen(false);
+  };
+  const handleMyOrdersClick = () => {
+    if (!user) {
+      router.push("/auth");
+      return;
+    }
+    router.push("/me/pre-orders");
+    setAccountMenuOpen(false);
+    setOpen(false);
   };
 
   const handleDashboardClick = () => {
@@ -259,11 +268,19 @@ export default function Navbar() {
                     <div className="my-1 h-px bg-gray-100" />
 
                     <button
-                      onClick={handleAccountClick}
+                      onClick={handleMyOrdersClick}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-800 hover:bg-gray-50"
                     >
                       <span className="text-[16px]">👤</span>
                       <span>Thông tin tài khoản</span>
+                    </button>
+
+                    <button
+                      onClick={handleMyOrdersClick}
+                      className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
+                    >
+                      <span className="text-[16px]">✍️</span>
+                      <span>Đơn hàng</span>
                     </button>
 
                     <button

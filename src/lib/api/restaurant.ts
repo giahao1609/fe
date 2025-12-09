@@ -4,7 +4,8 @@ import { MOCK_RESTAURANTS } from "@/data/mock";
 
 
 export type DayCode = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
-
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.food-map.online";
 export type Address = {
   country: string;       // "VN"
   city: string;          // "Ho Chi Minh"
@@ -296,4 +297,76 @@ export async function updateRestaurant(id: string, dto: UpdateRestaurantDto): Pr
 export async function deleteRestaurant(id: string): Promise<void> {
   const next = load().filter((r) => r._id !== id);
   save(next);
+}
+
+
+export async function getOwnerRestaurants(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}) {
+  const searchParams = new URLSearchParams();
+
+  if (params?.page) searchParams.set("page", String(params.page));
+  if (params?.limit) searchParams.set("limit", String(params.limit));
+  if (params?.search) searchParams.set("search", params.search);
+
+  const qs = searchParams.toString();
+  const url = `${API_BASE}/api/v1/owner/restaurants${qs ? `?${qs}` : ""}`;
+
+  const res = await fetch(url, {
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch restaurants: ${res.status}`);
+  }
+
+  const data = await res.json();
+
+  // tuỳ BE: nếu trả thẳng mảng thì return data
+  // hoặc nếu trả { items, total } thì return data.items
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.items)) return data.items;
+
+  return [];
+}
+
+/**
+ * Toggle ẩn/hiện nhà hàng (admin).
+ * Giả sử BE có endpoint PATCH /owner/restaurants/:id/visibility
+ * body: { isVisible: boolean }
+ */
+
+export async function toggleRestaurantVisibility(
+  restaurantId: string,
+  isVisible: boolean,
+) {
+  const res = await fetch(
+    `${API_BASE}/api/v1/owner/restaurants/${restaurantId}/visibility`,
+    {
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ isVisible }),
+    },
+  );
+
+  if (!res.ok) {
+    throw new Error(`Failed to toggle restaurant visibility: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export async function getRestaurantDetail(idOrSlug: string) {
+  const res = await fetch(`${API_BASE}/api/v1/owner/restaurants/detail/${idOrSlug}`, {
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch restaurant detail: ${res.status}`);
+  }
+
+  return res.json();
 }
