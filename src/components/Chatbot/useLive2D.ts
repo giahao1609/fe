@@ -162,7 +162,7 @@ export function useLive2D(
           e.preventDefault();
         };
         const onRestore = () => {
-          app.renderer.reset();
+          // app.renderer.reset();
         };
         glCanvas.addEventListener("webglcontextlost", onLost, false);
         glCanvas.addEventListener("webglcontextrestored", onRestore, false);

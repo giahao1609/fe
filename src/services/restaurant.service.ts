@@ -119,36 +119,112 @@ export const RestaurantService = {
    * POST /api/v1/owner/restaurants
    * Tạo nhà hàng mới (multipart/form-data)
    */
-  async createRestaurant(payload: CreateRestaurantPayload): Promise<Restaurant> {
-    const formData = new FormData();
+  // async createRestaurant(payload: any): Promise<Restaurant> {
+  //   const formData = new FormData();
 
-    formData.append("name", payload.name.trim());
-    formData.append("categoryId", payload.categoryId.trim());
-    formData.append("priceRange", payload.priceRange);
+  //   formData.append("name", payload.name.trim());
+  //   formData.append("categoryId", payload.categoryId.trim());
+  //   formData.append("priceRange", payload.priceRange);
 
-    formData.append("address", JSON.stringify(payload.address));
-    formData.append("openingHours", JSON.stringify(payload.openingHours));
+  //   formData.append("address", JSON.stringify(payload.address));
+  //   formData.append("openingHours", JSON.stringify(payload.openingHours));
 
-    if (payload.logo) formData.append("logo", payload.logo);
-    if (payload.cover) formData.append("cover", payload.cover);
-    if (payload.gallery && payload.gallery.length > 0) {
-      for (const file of payload.gallery) {
-        formData.append("gallery", file);
-      }
+  //   // 👈 THIẾU CHỖ NÀY
+  //   if (payload.paymentConfig) {
+  //     formData.append("paymentConfig", JSON.stringify(payload.paymentConfig));
+  //   }
+
+  //   // file đơn
+  //   if (payload.logo) formData.append("logo", payload.logo);
+  //   if (payload.cover) formData.append("cover", payload.cover);
+
+  //   // gallery
+  //   if (payload.gallery && payload.gallery.length > 0) {
+  //     for (const file of payload.gallery) {
+  //       formData.append("gallery", file);
+  //     }
+  //   }
+
+  //   // 👇 thêm bankQrs
+  //   if (payload.bankQrs && payload.bankQrs.length > 0) {
+  //     for (const file of payload.bankQrs) {
+  //       formData.append("bankQrs", file);
+  //     }
+  //   }
+
+  //   // 👇 thêm ewalletQrs
+  //   if (payload.ewalletQrs && payload.ewalletQrs.length > 0) {
+  //     for (const file of payload.ewalletQrs) {
+  //       formData.append("ewalletQrs", file);
+  //     }
+  //   }
+
+  //   const restaurant = await ApiService.postFormData<Restaurant>(
+  //     "/owner/restaurants",          // nhớ base URL có /api/v1 nếu backend đang dùng
+  //     formData,
+  //   );
+
+  //   NotifyService.success("Tạo nhà hàng thành công!");
+  //   return restaurant;
+  // },
+
+async createRestaurant(payload: any) {
+  const formData = new FormData();
+
+  // text fields
+  formData.append("name", payload.name.trim());
+  formData.append("categoryId", payload.categoryId.trim());
+  formData.append("priceRange", String(payload.priceRange));
+
+  // JSON fields – mirror với curl
+  formData.append("address", JSON.stringify(payload.address));
+  formData.append("openingHours", JSON.stringify(payload.openingHours));
+  formData.append("paymentConfig", JSON.stringify(payload.paymentConfig));
+
+  // single file
+  if (payload.logo) formData.append("logo", payload.logo);
+  if (payload.cover) formData.append("cover", payload.cover);
+
+  // gallery
+  if (payload.gallery && payload.gallery.length > 0) {
+    for (const file of payload.gallery) {
+      formData.append("gallery", file);
     }
+  }
 
-    const restaurant = await ApiService.postFormData<Restaurant>(
-      "/owner/restaurants",
-      formData,
-    );
+  // bankQrs
+  if (payload.bankQrs && payload.bankQrs.length > 0) {
+    for (const file of payload.bankQrs) {
+      formData.append("bankQrs", file);
+    }
+  }
 
-    NotifyService.success("Tạo nhà hàng thành công!");
-    return restaurant;
-  },
+  // ewalletQrs
+  if (payload.ewalletQrs && payload.ewalletQrs.length > 0) {
+    for (const file of payload.ewalletQrs) {
+      formData.append("ewalletQrs", file);
+    }
+  }
+
+  // 👇 Debug: xem FE thực sự append những gì
+  console.log(
+    "FormData entries:",
+    Array.from(formData.entries()).map(([k, v]) => [
+      k,
+      v instanceof File ? `${v.name} (${v.size} bytes)` : v,
+    ]),
+  );
+
+  const restaurant = await ApiService.postFormData<Restaurant>(
+    "/owner/restaurants",
+    formData,
+  );
+  return restaurant;
+},
 
   /**
    * GET /api/v1/owner/restaurants
-   * List nhà hàng của owner (có phân trang)
+   * List nhà hàng (có phân trang)
    */
   async listRestaurants(input?: {
     page?: number;
@@ -174,29 +250,161 @@ export const RestaurantService = {
   },
 
   /**
-   * GET /api/v1/owner/restaurants/detail/:id
-   * Lấy chi tiết 1 nhà hàng (bao gồm signed URL logo/cover/gallery)
-   *
-   * curl --location 'https://api.food-map.online/api/v1/owner/restaurants/detail/691f71667ddc4ff2de6cdeb4'
+   * GET /api/v1/owner/restaurants/get-by-owner
+   * Lấy danh sách nhà hàng của owner hiện tại
    */
-  async getRestaurantDetail(id: string): Promise<Restaurant> {
+  async getByOwner() {
+    const res = await ApiService.get("/owner/restaurants/get-by-owner");
+    return res;
+  },
+
+  /**
+   * GET /api/v1/owner/restaurants/detail/:idOrSlug
+   * Lấy chi tiết 1 nhà hàng (bao gồm signed URL logo/cover/gallery)
+   */
+  async getRestaurantDetail(
+    id: string,
+    opts?: { lat?: number | null; lng?: number | null },
+  ): Promise<Restaurant> {
     if (!id) {
       throw new Error("Restaurant id is required");
     }
 
+    const params: Record<string, any> = {};
+
+    // chỉ gửi lên khi thực sự có số
+    if (typeof opts?.lat === "number" && typeof opts?.lng === "number") {
+      params.lat = opts.lat;
+      params.lng = opts.lng;
+    }
+
     const res = await ApiService.get<Restaurant>(
       `/owner/restaurants/detail/${id}`,
+      { params },
     );
 
     return res;
   },
 
   /**
+   * ✅ ALIAS cho trang owner: dùng đúng tên mà component đang gọi
+   * GET /api/v1/owner/restaurants/detail/:idOrSlug
+   */
+  async getOwnerDetail(
+    idOrSlug: string,
+    opts?: { lat?: number | null; lng?: number | null },
+  ): Promise<Restaurant> {
+    return RestaurantService.getRestaurantDetail(idOrSlug, opts);
+  },
+
+  /**
+   * ✅ Update nhà hàng của owner
+   * POST /api/v1/owner/restaurants/:id  (multipart/form-data)
+   * Khớp với OwnerRestaurantsController.updateById
+   */
+  async updateOwnerRestaurant(
+    id: string,
+    payload: any,
+  ): Promise<Restaurant> {
+    if (!id) throw new Error("Restaurant id is required");
+
+    const formData = new FormData();
+
+    const appendIfString = (key: string, value?: string | null) => {
+      if (typeof value === "string" && value.trim().length > 0) {
+        formData.append(key, value.trim());
+      }
+    };
+
+    // ===== BASIC FIELDS =====
+    appendIfString("name", payload.name ?? null);
+    appendIfString("categoryId", payload.categoryId ?? null);
+    appendIfString("priceRange", payload.priceRange ?? null);
+    appendIfString("phone", payload.phone ?? null);
+    appendIfString("email", payload.email ?? null);
+    appendIfString("website", payload.website ?? null);
+    appendIfString("description", payload.description ?? null);
+    appendIfString("status", payload.status ?? null);
+
+    if (payload.address) {
+      formData.append("address", JSON.stringify(payload.address));
+    }
+
+    if (payload.openingHours) {
+      formData.append("openingHours", JSON.stringify(payload.openingHours));
+    }
+
+    if (Array.isArray(payload.tags)) {
+      formData.append("tags", JSON.stringify(payload.tags));
+    }
+
+    // ===== PAYMENT CONFIG + QR =====
+    // BE: if ('paymentConfig' in dto) { ... }
+    if (payload.paymentConfig !== undefined) {
+      // JSON.stringify(null) -> "null" => BE sẽ parse ra null và unset paymentConfig
+      formData.append(
+        "paymentConfig",
+        JSON.stringify(payload.paymentConfig),
+      );
+    }
+
+    if (Array.isArray(payload.bankQrs) && payload.bankQrs.length > 0) {
+      for (const file of payload.bankQrs) {
+        formData.append("bankQrs", file);
+      }
+    }
+
+    if (Array.isArray(payload.ewalletQrs) && payload.ewalletQrs.length > 0) {
+      for (const file of payload.ewalletQrs) {
+        formData.append("ewalletQrs", file);
+      }
+    }
+
+    // ===== MEDIA: LOGO / COVER / GALLERY =====
+    if (payload.logo instanceof File) {
+      formData.append("logo", payload.logo);
+    }
+    if (payload.cover instanceof File) {
+      formData.append("cover", payload.cover);
+    }
+    if (Array.isArray(payload.gallery) && payload.gallery.length > 0) {
+      for (const file of payload.gallery) {
+        formData.append("gallery", file);
+      }
+    }
+
+    // ===== FLAGS MEDIA (match parseBool/parseJsonArray ở BE) =====
+    if (typeof payload.removeLogo === "boolean") {
+      formData.append("removeLogo", String(payload.removeLogo));
+    }
+    if (typeof payload.removeCover === "boolean") {
+      formData.append("removeCover", String(payload.removeCover));
+    }
+    if (payload.galleryMode) {
+      formData.append("galleryMode", payload.galleryMode);
+    }
+    if (Array.isArray(payload.galleryRemovePaths)) {
+      formData.append(
+        "galleryRemovePaths",
+        JSON.stringify(payload.galleryRemovePaths),
+      );
+    }
+    if (typeof payload.removeAllGallery === "boolean") {
+      formData.append("removeAllGallery", String(payload.removeAllGallery));
+    }
+
+    // ===== CALL API =====
+    const restaurant = await ApiService.postFormData<Restaurant>(
+      `/owner/restaurants/${id}`,
+      formData,
+    );
+
+    NotifyService.success("Cập nhật nhà hàng thành công!");
+    return restaurant;
+  },
+
+  /**
    * GET /api/v1/owner/restaurants/nearby
-   *  ?lat=10.77653
-   *  &lng=106.70098
-   *  &maxDistanceMeters=115000
-   *  &limit=10
    */
   async getNearbyRestaurants(input: {
     lat: number;
@@ -217,7 +425,6 @@ export const RestaurantService = {
     const rawLimit = Number(input.limit ?? 20);
     const limit = Math.min(999, Math.max(1, rawLimit));
 
-    // build query string thủ công để không bị ?params=[object Object]
     const qs = new URLSearchParams({
       lat: String(lat),
       lng: String(lng),

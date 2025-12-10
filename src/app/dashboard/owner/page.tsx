@@ -7,15 +7,24 @@ import OwnerSidebar from "@/components/owner/OwnerSidebar";
 import PostsTab from "@/components/owner/PostsTab";
 import RestaurantsTab from "@/components/owner/RestaurantsTab";
 import StoreSettings from "@/components/owner/StoreSettings";
+import OwnerBlogsTab from "@/components/owner/blogs/OwnerBlogsTab";
 import { useEffect, useState } from "react";
+import { OwnerPreOrder } from "@/components/owner-pre-order/OwnerPreOrder";
 
-export type OwnerTab = "overview" | "store" | "comments" | "posts" | "restaurants" |"menu";
+export type OwnerTab =
+  | "overview"
+  | "store"
+  | "comments"
+  | "posts"
+  | "restaurants"
+  | "menu"
+  | "blogs"
+  | "order";
 
 export default function OwnerPage() {
   const [tab, setTab] = useState<OwnerTab>("overview");
 
-  useEffect(() => {
-  }, []);
+  useEffect(() => {}, []);
 
   return (
     <div className="flex h-screen bg-[#f5f7fb] text-gray-800">
@@ -26,7 +35,9 @@ export default function OwnerPage() {
         {tab === "comments" && <CommentsTab />}
         {tab === "posts" && <PostsTab />}
         {tab === "restaurants" && <RestaurantsTab />}
-          {tab === "menu" && <MenuItemsDemoTab />}
+        {tab === "menu" && <MenuItemsDemoTab />}
+        {tab === "blogs" && <OwnerBlogsTab />}
+        {tab === "order" && <OwnerPreOrder />}
       </main>
     </div>
   );

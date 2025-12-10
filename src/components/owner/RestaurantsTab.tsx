@@ -6,13 +6,11 @@ import "mapbox-gl/dist/mapbox-gl.css";
 
 import {
   RestaurantService,
-  CreateRestaurantPayload,
-  Restaurant,
+  type CreateRestaurantPayload,
+  type Restaurant,
 } from "@/services/restaurant.service";
-import {
-  CategoryService,
-  type Category,
-} from "@/services/category.service";
+import { CategoryService, type Category } from "@/services/category.service";
+import { toast } from "sonner";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_API_KEY || "";
 
@@ -35,6 +33,23 @@ interface CategoryOption {
   icon?: string;
 }
 
+// Reuse type cho form – giống schema backend nhưng cho phép field rỗng
+type BankTransferForm = {
+  bankCode: string;
+  bankName: string;
+  accountName: string;
+  accountNumber: string;
+  branch?: string;
+  note?: string;
+};
+
+type EWalletForm = {
+  provider: string;
+  displayName: string;
+  phoneNumber: string;
+  note?: string;
+};
+
 export default function RestaurantsTab() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -46,9 +61,9 @@ export default function RestaurantsTab() {
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
-  const [categoryId, setCategoryId] = useState(""); // giờ là _id chọn từ dropdown
+  const [categoryId, setCategoryId] = useState("");
   const [priceRange, setPriceRange] = useState<"$" | "$$" | "$$$" | "$$$$">(
-    "$$",
+    "$$"
   );
 
   const [street, setStreet] = useState("");
@@ -62,29 +77,45 @@ export default function RestaurantsTab() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+  const [bankQrFiles, setBankQrFiles] = useState<File[]>([]);
+  const [ewalletQrFiles, setEwalletQrFiles] = useState<File[]>([]);
 
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
+  const [bankQrPreviews, setBankQrPreviews] = useState<string[]>([]);
+  const [ewalletQrPreviews, setEwalletQrPreviews] = useState<string[]>([]);
 
   const [openTime, setOpenTime] = useState("08:00");
   const [closeTime, setCloseTime] = useState("22:00");
-
   const [selectedDays, setSelectedDays] = useState<string[]>(
-    DAY_ITEMS.map((d) => d.value),
+    DAY_ITEMS.map((d) => d.value)
   );
 
+  // Payment config
+  const [allowCash, setAllowCash] = useState(true);
+  const [allowBankTransfer, setAllowBankTransfer] = useState(true);
+  const [allowEWallet, setAllowEWallet] = useState(true);
+  const [generalNote, setGeneralNote] = useState("");
+  const [bankTransfers, setBankTransfers] = useState<BankTransferForm[]>([
+    { bankCode: "", bankName: "", accountName: "", accountNumber: "" },
+  ]);
+  const [eWallets, setEWallets] = useState<EWalletForm[]>([
+    { provider: "", displayName: "", phoneNumber: "" },
+  ]);
+
+  // Drag state
   const [logoDragging, setLogoDragging] = useState(false);
   const [coverDragging, setCoverDragging] = useState(false);
   const [galleryDragging, setGalleryDragging] = useState(false);
+  const [bankQrDragging, setBankQrDragging] = useState(false);
+  const [ewalletQrDragging, setEwalletQrDragging] = useState(false);
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
 
-  const [createdRestaurant, setCreatedRestaurant] = useState<Restaurant | null>(
-    null,
-  );
+  const [createdRestaurant, setCreatedRestaurant] = useState<any | null>(null);
 
   // ==== LOAD CATEGORY TREE ====
   const loadCategories = async () => {
@@ -96,7 +127,7 @@ export default function RestaurantsTab() {
     } catch (err: any) {
       console.error(err);
       setCategoriesError(
-        err?.message || "Không tải được danh sách danh mục món ăn.",
+        err?.message || "Không tải được danh sách danh mục món ăn."
       );
     } finally {
       setCategoriesLoading(false);
@@ -109,7 +140,6 @@ export default function RestaurantsTab() {
 
   const categoryOptions = useMemo<CategoryOption[]>(() => {
     const arr: CategoryOption[] = [];
-
     const walk = (nodes: Category[], depth: number) => {
       for (const node of nodes) {
         arr.push({
@@ -123,49 +153,25 @@ export default function RestaurantsTab() {
         }
       }
     };
-
     walk(categoriesTree, 0);
     return arr;
   }, [categoriesTree]);
 
-  const resetForm = () => {
-    setName("");
-    setCategoryId("");
-    setStreet("");
-    setWard("");
-    setDistrict("");
-    setCity("");
-    setCountry("");
-    setLat("");
-    setLng("");
-    setLogoFile(null);
-    setCoverFile(null);
-    setGalleryFiles([]);
-    setLogoPreview(null);
-    setCoverPreview(null);
-    setGalleryPreviews([]);
-    setMsg(null);
-    setError(null);
-    setOpenTime("08:00");
-    setCloseTime("22:00");
-    setPriceRange("$$");
-    setSelectedDays(DAY_ITEMS.map((d) => d.value));
-  };
 
+
+  // Drag helpers
   const onDragOver =
-    (setDragging: (b: boolean) => void) =>
-    (e: DragEvent<HTMLDivElement>) => {
+    (setDragging: (b: boolean) => void) => (e: DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       setDragging(true);
     };
-
   const onDragLeave =
-    (setDragging: (b: boolean) => void) =>
-    (e: DragEvent<HTMLDivElement>) => {
+    (setDragging: (b: boolean) => void) => (e: DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       setDragging(false);
     };
 
+  // Drop handlers
   const handleLogoDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setLogoDragging(false);
@@ -175,7 +181,6 @@ export default function RestaurantsTab() {
       setLogoPreview(URL.createObjectURL(file));
     }
   };
-
   const handleCoverDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setCoverDragging(false);
@@ -185,13 +190,12 @@ export default function RestaurantsTab() {
       setCoverPreview(URL.createObjectURL(file));
     }
   };
-
   const handleGalleryDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setGalleryDragging(false);
     const files = e.dataTransfer.files
       ? Array.from(e.dataTransfer.files).filter((f) =>
-          f.type.startsWith("image/"),
+          f.type.startsWith("image/")
         )
       : [];
     if (files.length) {
@@ -202,19 +206,50 @@ export default function RestaurantsTab() {
       ]);
     }
   };
+  const handleBankQrDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setBankQrDragging(false);
+    const files = e.dataTransfer.files
+      ? Array.from(e.dataTransfer.files).filter((f) =>
+          f.type.startsWith("image/")
+        )
+      : [];
+    if (files.length) {
+      setBankQrFiles((prev) => [...prev, ...files]);
+      setBankQrPreviews((prev) => [
+        ...prev,
+        ...files.map((f) => URL.createObjectURL(f)),
+      ]);
+    }
+  };
+  const handleEwalletQrDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setEwalletQrDragging(false);
+    const files = e.dataTransfer.files
+      ? Array.from(e.dataTransfer.files).filter((f) =>
+          f.type.startsWith("image/")
+        )
+      : [];
+    if (files.length) {
+      setEwalletQrFiles((prev) => [...prev, ...files]);
+      setEwalletQrPreviews((prev) => [
+        ...prev,
+        ...files.map((f) => URL.createObjectURL(f)),
+      ]);
+    }
+  };
 
+  // Input file handlers
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setLogoFile(file);
     if (file) setLogoPreview(URL.createObjectURL(file));
   };
-
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setCoverFile(file);
     if (file) setCoverPreview(URL.createObjectURL(file));
   };
-
   const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files ? Array.from(e.target.files) : [];
     if (files.length) {
@@ -225,10 +260,30 @@ export default function RestaurantsTab() {
       ]);
     }
   };
+  const handleBankQrChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length) {
+      setBankQrFiles((prev) => [...prev, ...files]);
+      setBankQrPreviews((prev) => [
+        ...prev,
+        ...files.map((f) => URL.createObjectURL(f)),
+      ]);
+    }
+  };
+  const handleEwalletQrChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length) {
+      setEwalletQrFiles((prev) => [...prev, ...files]);
+      setEwalletQrPreviews((prev) => [
+        ...prev,
+        ...files.map((f) => URL.createObjectURL(f)),
+      ]);
+    }
+  };
 
   const toggleDay = (value: string) => {
     setSelectedDays((prev) =>
-      prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value],
+      prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]
     );
   };
 
@@ -258,7 +313,7 @@ export default function RestaurantsTab() {
 
     map.addControl(
       new mapboxgl.NavigationControl({ visualizePitch: true }),
-      "top-right",
+      "top-right"
     );
     map.addControl(new mapboxgl.FullscreenControl(), "top-right");
     map.addControl(
@@ -268,7 +323,7 @@ export default function RestaurantsTab() {
         showAccuracyCircle: false,
         fitBoundsOptions: { maxZoom: 16 },
       }),
-      "top-right",
+      "top-right"
     );
 
     map.on("click", (e) => {
@@ -313,41 +368,219 @@ export default function RestaurantsTab() {
     }
   }, [lat, lng]);
 
+  // Helpers edit list bank / eWallet
+  const updateBankTransfer = (
+    i: number,
+    key: keyof BankTransferForm,
+    v: string
+  ) => {
+    setBankTransfers((prev) => {
+      const next = [...prev];
+      next[i] = { ...next[i], [key]: v };
+      return next;
+    });
+  };
+  const addBankTransfer = () =>
+    setBankTransfers((prev) => [
+      ...prev,
+      { bankCode: "", bankName: "", accountName: "", accountNumber: "" },
+    ]);
+  const removeBankTransfer = (i: number) =>
+    setBankTransfers((prev) => prev.filter((_, idx) => idx !== i));
+
+  const updateEWallet = (i: number, key: keyof EWalletForm, v: string) => {
+    setEWallets((prev) => {
+      const next = [...prev];
+      next[i] = { ...next[i], [key]: v };
+      return next;
+    });
+  };
+  const addEWallet = () =>
+    setEWallets((prev) => [
+      ...prev,
+      { provider: "", displayName: "", phoneNumber: "" },
+    ]);
+  const removeEWallet = (i: number) =>
+    setEWallets((prev) => prev.filter((_, idx) => idx !== i));
+
+  // Submit
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setError(null);
+  //   setMsg(null);
+
+  //   if (!name.trim()) return setError("Vui lòng nhập tên nhà hàng.");
+  //   if (!categoryId.trim()) return setError("Vui lòng chọn danh mục món ăn.");
+  //   if (!street.trim() || !ward.trim() || !district.trim() || !city.trim())
+  //     return setError("Vui lòng nhập đầy đủ địa chỉ.");
+  //   if (!country.trim()) return setError("Vui lòng nhập quốc gia.");
+  //   if (!lat || !lng || Number.isNaN(Number(lat)) || Number.isNaN(Number(lng)))
+  //     return setError("Tọa độ không hợp lệ. Hãy click lên bản đồ để chọn vị trí.");
+  //   if (selectedDays.length === 0) return setError("Vui lòng chọn ít nhất một ngày mở cửa.");
+
+  //   const openingHours = selectedDays.map((day) => ({
+  //     day,
+  //     periods: [{ opens: openTime, closes: closeTime }],
+  //     closed: false,
+  //     is24h: false,
+  //   }));
+
+  //   const paymentConfig: any = {
+  //     allowCash,
+  //     allowBankTransfer,
+  //     allowEWallet,
+  //     generalNote: generalNote.trim() || undefined,
+  //     bankTransfers: bankTransfers
+  //       .filter((b) => b.bankCode || b.bankName || b.accountName || b.accountNumber)
+  //       .map<any>((b) => ({
+  //         bankCode: b.bankCode.trim(),
+  //         bankName: b.bankName.trim(),
+  //         accountName: b.accountName.trim(),
+  //         accountNumber: b.accountNumber.trim(),
+  //         branch: b.branch?.trim() || undefined,
+  //         note: b.note?.trim() || undefined,
+  //       })),
+  //     eWallets: eWallets
+  //       .filter((w) => w.provider || w.displayName || w.phoneNumber)
+  //       .map<any>((w) => ({
+  //         provider: w.provider.trim(),
+  //         displayName: w.displayName.trim(),
+  //         phoneNumber: w.phoneNumber.trim(),
+  //         note: w.note?.trim() || undefined,
+  //       })),
+  //   };
+
+  //   const payload: any = {
+  //     name: name.trim(),
+  //     categoryId: categoryId.trim(),
+  //     priceRange,
+  //     address: {
+  //       country: country.trim(),
+  //       city: city.trim(),
+  //       district: district.trim(),
+  //       ward: ward.trim(),
+  //       street: street.trim(),
+  //       locationType: "Point",
+  //       coordinates: [Number(lng), Number(lat)],
+  //     },
+  //     openingHours,
+  //     paymentConfig,
+  //     logo: logoFile || undefined,
+  //     cover: coverFile || undefined,
+  //     gallery: galleryFiles,
+  //     bankQrs: bankQrFiles,
+  //     ewalletQrs: ewalletQrFiles,
+  //   };
+
+  //   console.log("Create restaurant payload:", payload);
+
+  //   setLoading(true);
+  //   try {
+  //     const created = await RestaurantService.createRestaurant(payload);
+  //     setCreatedRestaurant(created);
+  //     setMsg("✅ Đăng quán thành công! Quán mới của bạn đã được tạo.");
+  //     resetForm();
+  //   } catch (err: any) {
+  //     console.error(err);
+  //     setError(err?.message || "❌ Không thể tạo nhà hàng. Vui lòng thử lại.");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+  const resetForm = () => {
+  setName("");
+  setCategoryId("");
+  setStreet("");
+  setWard("");
+  setDistrict("");
+  setCity("");
+  setCountry("");
+  setLat("");
+  setLng("");
+  setLogoFile(null);
+  setCoverFile(null);
+  setGalleryFiles([]);
+  setLogoPreview(null);
+  setCoverPreview(null);
+  setGalleryPreviews([]);
+  setMsg(null);
+  setError(null);
+  setOpenTime("08:00");
+  setCloseTime("22:00");
+  setPriceRange("$$");
+  setSelectedDays(DAY_ITEMS.map((d) => d.value));
+
+  setAllowCash(true);
+  setAllowBankTransfer(true);
+  setAllowEWallet(true);
+  setGeneralNote("");
+  setBankTransfers([{ bankCode: "", bankName: "", accountName: "", accountNumber: "" }]);
+  setEWallets([{ provider: "", displayName: "", phoneNumber: "" }]);
+
+  setBankQrFiles([]);
+  setEwalletQrFiles([]);
+  setBankQrPreviews([]);
+  setEwalletQrPreviews([]);
+
+  // 👇 thêm
+  setCreatedRestaurant(null);
+};
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setMsg(null);
 
     if (!name.trim()) {
-      setError("Vui lòng nhập tên nhà hàng.");
+      const m = "Vui lòng nhập tên nhà hàng.";
+      setError(m);
+      toast.error(m);
       return;
     }
 
     if (!categoryId.trim()) {
-      setError("Vui lòng chọn danh mục món ăn.");
+      const m = "Vui lòng chọn danh mục món ăn.";
+      setError(m);
+      toast.error(m);
       return;
     }
 
     if (!street.trim() || !ward.trim() || !district.trim() || !city.trim()) {
-      setError("Vui lòng nhập đầy đủ địa chỉ.");
+      const m = "Vui lòng nhập đầy đủ địa chỉ.";
+      setError(m);
+      toast.error(m);
       return;
     }
 
     if (!country.trim()) {
-      setError("Vui lòng nhập quốc gia.");
+      const m = "Vui lòng nhập quốc gia.";
+      setError(m);
+      toast.error(m);
       return;
     }
 
-    if (!lat || !lng || Number.isNaN(Number(lat)) || Number.isNaN(Number(lng))) {
-      setError("Tọa độ không hợp lệ. Hãy click lên bản đồ để chọn vị trí.");
+    if (
+      !lat ||
+      !lng ||
+      Number.isNaN(Number(lat)) ||
+      Number.isNaN(Number(lng))
+    ) {
+      const m = "Tọa độ không hợp lệ. Hãy click lên bản đồ để chọn vị trí.";
+      setError(m);
+      toast.error(m);
       return;
     }
 
     if (selectedDays.length === 0) {
-      setError("Vui lòng chọn ít nhất một ngày mở cửa.");
+      const m = "Vui lòng chọn ít nhất một ngày mở cửa.";
+      setError(m);
+      toast.error(m);
       return;
     }
 
+    // ... phần build openingHours, paymentConfig, payload giữ nguyên
     const openingHours = selectedDays.map((day) => ({
       day,
       periods: [{ opens: openTime, closes: closeTime }],
@@ -355,9 +588,36 @@ export default function RestaurantsTab() {
       is24h: false,
     }));
 
-    const payload: CreateRestaurantPayload = {
+    const paymentConfig: any = {
+      allowCash,
+      allowBankTransfer,
+      allowEWallet,
+      generalNote: generalNote.trim() || undefined,
+      bankTransfers: bankTransfers
+        .filter(
+          (b) => b.bankCode || b.bankName || b.accountName || b.accountNumber
+        )
+        .map<any>((b) => ({
+          bankCode: b.bankCode.trim(),
+          bankName: b.bankName.trim(),
+          accountName: b.accountName.trim(),
+          accountNumber: b.accountNumber.trim(),
+          branch: b.branch?.trim() || undefined,
+          note: b.note?.trim() || undefined,
+        })),
+      eWallets: eWallets
+        .filter((w) => w.provider || w.displayName || w.phoneNumber)
+        .map<any>((w) => ({
+          provider: w.provider.trim(),
+          displayName: w.displayName.trim(),
+          phoneNumber: w.phoneNumber.trim(),
+          note: w.note?.trim() || undefined,
+        })),
+    };
+
+    const payload: any = {
       name: name.trim(),
-      categoryId: categoryId.trim(), // dùng _id từ dropdown
+      categoryId: categoryId.trim(),
       priceRange,
       address: {
         country: country.trim(),
@@ -369,30 +629,46 @@ export default function RestaurantsTab() {
         coordinates: [Number(lng), Number(lat)],
       },
       openingHours,
+      paymentConfig,
       logo: logoFile || undefined,
       cover: coverFile || undefined,
       gallery: galleryFiles,
+      bankQrs: bankQrFiles,
+      ewalletQrs: ewalletQrFiles,
     };
+
+    console.log("Create restaurant payload:", payload);
 
     setLoading(true);
     try {
       const created = await RestaurantService.createRestaurant(payload);
       setCreatedRestaurant(created);
-      setMsg("✅ Đăng quán thành công! Quán mới của bạn đã được tạo.");
+
+      const successMsg =
+        "✅ Đăng quán thành công! Quán mới của bạn đã được tạo.";
+      setMsg(successMsg);
+      toast.success(successMsg); // 👈 toast success
+
       resetForm();
     } catch (err: any) {
       console.error(err);
-      setError(
-        err?.message || "❌ Không thể tạo nhà hàng. Vui lòng thử lại.",
-      );
+      // lấy message từ BE nếu có
+      const apiMessage =
+        err?.response?.data?.message ||
+        err?.message ||
+        "❌ Không thể tạo nhà hàng. Vui lòng thử lại.";
+
+      setError(apiMessage);
+      toast.error(apiMessage); // 👈 toast error
     } finally {
       setLoading(false);
     }
   };
 
-  const fullAddressPreview = createdRestaurant
-    ? `${createdRestaurant.address.street}, ${createdRestaurant.address.ward}, ${createdRestaurant.address.district}, ${createdRestaurant.address.city}, ${createdRestaurant.address.country}`
-    : "";
+  const fullAddressPreview =
+    createdRestaurant && createdRestaurant.address
+      ? `${createdRestaurant.address.street}, ${createdRestaurant.address.ward}, ${createdRestaurant.address.district}, ${createdRestaurant.address.city}, ${createdRestaurant.address.country}`
+      : "";
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -423,10 +699,11 @@ export default function RestaurantsTab() {
       {/* Form */}
       <form
         onSubmit={handleSubmit}
-        className="grid gap-6 rounded-2xl bg-white p-6 shadow-sm lg:grid-cols-[1.9fr,2.1fr]"
+        className="grid gap-6 rounded-2xl bg-white p-6 shadow-sm lg:grid-cols-[1.6fr,2.4fr]"
       >
-        {/* Cột trái: Thông tin cơ bản + ảnh */}
+        {/* Cột trái: Thông tin cơ bản + ảnh + payment */}
         <div className="space-y-5">
+          {/* 01 Thông tin cơ bản */}
           <div>
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
               01 · Thông tin cơ bản
@@ -481,10 +758,6 @@ export default function RestaurantsTab() {
               {categoriesError && (
                 <p className="text-xs text-rose-500">{categoriesError}</p>
               )}
-              <p className="text-xs text-gray-400">
-                Dữ liệu lấy từ cây danh mục Category. Sau này có thể phân loại
-                quán theo nhiều nhóm.
-              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -537,9 +810,7 @@ export default function RestaurantsTab() {
                       ? "border-rose-400 bg-rose-50"
                       : "border-gray-300 bg-gray-50 hover:border-rose-300"
                   }`}
-                  onClick={() =>
-                    document.getElementById("logo-input")?.click()
-                  }
+                  onClick={() => document.getElementById("logo-input")?.click()}
                 >
                   <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-white shadow-sm">
                     {logoPreview ? (
@@ -657,22 +928,361 @@ export default function RestaurantsTab() {
                 className="hidden"
                 onChange={handleGalleryChange}
               />
+              {galleryPreviews.length > 0 && (
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                  {galleryPreviews.map((src, idx) => (
+                    <div
+                      key={idx}
+                      className="relative h-20 overflow-hidden rounded-lg border border-gray-100 bg-gray-100"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={src}
+                        alt={`Gallery ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
+          </div>
+
+          {/* 02 Cấu hình thanh toán */}
+          <div className="space-y-3 rounded-xl bg-emerald-50/60 p-4">
+            <div className="mb-1">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-600">
+                02 · Cấu hình thanh toán
+              </h2>
+              <p className="mt-1 text-xs text-gray-500">
+                Bật/tắt các phương thức & nhập thông tin nhận tiền.
+              </p>
+            </div>
+
+            {/* toggles */}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={allowCash}
+                  onChange={(e) => setAllowCash(e.target.checked)}
+                />
+                Tiền mặt
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={allowBankTransfer}
+                  onChange={(e) => setAllowBankTransfer(e.target.checked)}
+                />
+                Chuyển khoản ngân hàng
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={allowEWallet}
+                  onChange={(e) => setAllowEWallet(e.target.checked)}
+                />
+                Ví điện tử
+              </label>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-gray-700">
+                Ghi chú chung (hiển thị cho khách)
+              </label>
+              <input
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                value={generalNote}
+                onChange={(e) => setGeneralNote(e.target.value)}
+                placeholder="VD: Vui lòng ghi mã đơn ở phần nội dung chuyển khoản…"
+              />
+            </div>
+
+            {/* Ngân hàng */}
+            {allowBankTransfer && (
+              <div className="space-y-2 rounded-xl border border-emerald-200 bg-white p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-emerald-700">
+                    Tài khoản ngân hàng
+                  </p>
+                  <button
+                    type="button"
+                    onClick={addBankTransfer}
+                    className="text-xs font-medium text-emerald-700 hover:underline"
+                  >
+                    + Thêm tài khoản
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {bankTransfers.map((b, idx) => (
+                    <div key={idx} className="grid gap-2 sm:grid-cols-2">
+                      <input
+                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                        placeholder="Mã NH (VD: VCB)"
+                        value={b.bankCode}
+                        onChange={(e) =>
+                          updateBankTransfer(idx, "bankCode", e.target.value)
+                        }
+                      />
+                      <input
+                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                        placeholder="Tên ngân hàng"
+                        value={b.bankName}
+                        onChange={(e) =>
+                          updateBankTransfer(idx, "bankName", e.target.value)
+                        }
+                      />
+                      <input
+                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                        placeholder="Tên chủ tài khoản"
+                        value={b.accountName}
+                        onChange={(e) =>
+                          updateBankTransfer(idx, "accountName", e.target.value)
+                        }
+                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                          placeholder="Số tài khoản"
+                          value={b.accountNumber}
+                          onChange={(e) =>
+                            updateBankTransfer(
+                              idx,
+                              "accountNumber",
+                              e.target.value
+                            )
+                          }
+                        />
+                        {bankTransfers.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeBankTransfer(idx)}
+                            className="text-xs text-rose-600 hover:underline"
+                          >
+                            Xóa
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                        placeholder="Chi nhánh (tùy chọn)"
+                        value={b.branch || ""}
+                        onChange={(e) =>
+                          updateBankTransfer(idx, "branch", e.target.value)
+                        }
+                      />
+                      <input
+                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                        placeholder="Ghi chú (tùy chọn)"
+                        value={b.note || ""}
+                        onChange={(e) =>
+                          updateBankTransfer(idx, "note", e.target.value)
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bank QRs */}
+                <div className="mt-3 space-y-1">
+                  <label className="text-xs font-medium text-gray-700">
+                    QR chuyển khoản (nhiều ảnh)
+                  </label>
+                  <div
+                    onDragOver={onDragOver(setBankQrDragging)}
+                    onDragLeave={onDragLeave(setBankQrDragging)}
+                    onDrop={handleBankQrDrop}
+                    className={`flex cursor-pointer flex-col gap-1 rounded-xl border border-dashed px-3 py-3 text-xs transition ${
+                      bankQrDragging
+                        ? "border-emerald-400 bg-emerald-50"
+                        : "border-gray-300 bg-white hover:border-emerald-300"
+                    }`}
+                    onClick={() =>
+                      document.getElementById("bankqr-input")?.click()
+                    }
+                  >
+                    <p className="font-medium text-gray-700">
+                      Kéo thả ảnh QR ngân hàng vào đây
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      Có thể chọn nhiều file.
+                    </p>
+                    {bankQrFiles.length > 0 && (
+                      <p className="text-[11px] text-emerald-600">
+                        Đã chọn {bankQrFiles.length} ảnh.
+                      </p>
+                    )}
+                  </div>
+                  <input
+                    id="bankqr-input"
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleBankQrChange}
+                  />
+                  {bankQrPreviews.length > 0 && (
+                    <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                      {bankQrPreviews.map((src, idx) => (
+                        <div
+                          key={idx}
+                          className="relative h-20 overflow-hidden rounded-lg border border-gray-100 bg-gray-100"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={src}
+                            alt={`Bank QR ${idx + 1}`}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Ví điện tử */}
+            {allowEWallet && (
+              <div className="space-y-2 rounded-xl border border-emerald-200 bg-white p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-emerald-700">
+                    Ví điện tử
+                  </p>
+                  <button
+                    type="button"
+                    onClick={addEWallet}
+                    className="text-xs font-medium text-emerald-700 hover:underline"
+                  >
+                    + Thêm ví
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {eWallets.map((w, idx) => (
+                    <div key={idx} className="grid gap-2 sm:grid-cols-2">
+                      <input
+                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                        placeholder="Nhà cung cấp (VD: MOMO, ZaloPay)"
+                        value={w.provider}
+                        onChange={(e) =>
+                          updateEWallet(idx, "provider", e.target.value)
+                        }
+                      />
+                      <input
+                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                        placeholder="Tên hiển thị"
+                        value={w.displayName}
+                        onChange={(e) =>
+                          updateEWallet(idx, "displayName", e.target.value)
+                        }
+                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                          placeholder="Số điện thoại"
+                          value={w.phoneNumber}
+                          onChange={(e) =>
+                            updateEWallet(idx, "phoneNumber", e.target.value)
+                          }
+                        />
+                        {eWallets.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeEWallet(idx)}
+                            className="text-xs text-rose-600 hover:underline"
+                          >
+                            Xóa
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        className="rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100"
+                        placeholder="Ghi chú (tùy chọn)"
+                        value={w.note || ""}
+                        onChange={(e) =>
+                          updateEWallet(idx, "note", e.target.value)
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Ewallet QRs */}
+                <div className="mt-3 space-y-1">
+                  <label className="text-xs font-medium text-gray-700">
+                    QR ví điện tử (nhiều ảnh)
+                  </label>
+                  <div
+                    onDragOver={onDragOver(setEwalletQrDragging)}
+                    onDragLeave={onDragLeave(setEwalletQrDragging)}
+                    onDrop={handleEwalletQrDrop}
+                    className={`flex cursor-pointer flex-col gap-1 rounded-xl border border-dashed px-3 py-3 text-xs transition ${
+                      ewalletQrDragging
+                        ? "border-emerald-400 bg-emerald-50"
+                        : "border-gray-300 bg-white hover:border-emerald-300"
+                    }`}
+                    onClick={() =>
+                      document.getElementById("ewalletqr-input")?.click()
+                    }
+                  >
+                    <p className="font-medium text-gray-700">
+                      Kéo thả ảnh QR ví điện tử vào đây
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      Có thể chọn nhiều file.
+                    </p>
+                    {ewalletQrFiles.length > 0 && (
+                      <p className="text-[11px] text-emerald-600">
+                        Đã chọn {ewalletQrFiles.length} ảnh.
+                      </p>
+                    )}
+                  </div>
+                  <input
+                    id="ewalletqr-input"
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleEwalletQrChange}
+                  />
+                  {ewalletQrPreviews.length > 0 && (
+                    <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                      {ewalletQrPreviews.map((src, idx) => (
+                        <div
+                          key={idx}
+                          className="relative h-20 overflow-hidden rounded-lg border border-gray-100 bg-gray-100"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={src}
+                            alt={`Ewallet QR ${idx + 1}`}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Cột phải: Địa chỉ, bản đồ & giờ mở cửa */}
+        {/* Cột phải: Địa chỉ, bản đồ & giờ mở cửa + submit */}
         <div className="space-y-5">
-          {/* Địa chỉ + map */}
+          {/* 03 Địa chỉ + map */}
           <div className="space-y-3 rounded-xl bg-gray-50 p-4">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-                  02 · Địa chỉ & bản đồ
+                  03 · Địa chỉ & bản đồ
                 </h2>
                 <p className="mt-1 text-xs text-gray-500">
-                  Điền địa chỉ và chọn chính xác vị trí trên bản đồ để hiển thị
-                  đúng cho khách.
+                  Điền địa chỉ và chọn chính xác vị trí trên bản đồ.
                 </p>
               </div>
               <span className="hidden text-xs text-gray-400 md:inline">
@@ -780,12 +1390,12 @@ export default function RestaurantsTab() {
             </div>
           </div>
 
-          {/* Giờ mở cửa + submit */}
+          {/* 04 Giờ mở cửa + submit */}
           <div className="space-y-3 rounded-xl bg-gray-50 p-4">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
-                  03 · Giờ mở cửa theo ngày
+                  04 · Giờ mở cửa theo ngày
                 </h2>
                 <p className="mt-1 text-xs text-gray-500">
                   Chọn các ngày mở cửa và thời gian áp dụng chung.
@@ -870,7 +1480,6 @@ export default function RestaurantsTab() {
             {/* Cover + logo */}
             <div className="space-y-3">
               <div className="relative overflow-hidden rounded-xl border border-gray-100 bg-gray-100">
-                {/* Cover full-width */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={
@@ -882,12 +1491,11 @@ export default function RestaurantsTab() {
                 />
                 {/* Logo overlay */}
                 <div className="absolute bottom-3 left-3 flex items-center gap-3 rounded-2xl bg-black/40 px-3 py-2 backdrop-blur-sm">
-                  <div className="relative h-12 w-12 overflow-hidden rounded-xl border border-white/50 bg-gray-200">
+                  <div className="relative h-12 w-12 overflow-hidden rounded-2xl border border-white/50 bg-gray-200">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={
-                        logoPreview ||
-                        "https://placehold.co/120x120?text=Logo"
+                        logoPreview || "https://placehold.co/120x120?text=Logo"
                       }
                       alt="Logo preview"
                       className="h-full w-full object-cover"
@@ -898,8 +1506,8 @@ export default function RestaurantsTab() {
                       {name || "Tên nhà hàng của bạn"}
                     </p>
                     <p className="text-[11px] text-gray-100">
-                      {priceRange || "$$"} ·{" "}
-                      {district || "Quận ?"}, {city || "Thành phố ?"}
+                      {priceRange || "$$"} · {district || "Quận ?"},{" "}
+                      {city || "Thành phố ?"}
                     </p>
                   </div>
                 </div>
@@ -933,9 +1541,7 @@ export default function RestaurantsTab() {
             {/* Info nhỏ */}
             <div className="space-y-3 rounded-xl bg-gray-50 p-4 text-xs">
               <div>
-                <p className="font-semibold text-gray-800">
-                  Thông tin cơ bản
-                </p>
+                <p className="font-semibold text-gray-800">Thông tin cơ bản</p>
                 <p className="mt-1 text-gray-700">
                   {name || "Tên nhà hàng của bạn"}
                 </p>
@@ -969,9 +1575,17 @@ export default function RestaurantsTab() {
               <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
 
               <div>
-                <p className="font-semibold text-gray-800">
-                  Tọa độ (nếu có)
+                <p className="font-semibold text-gray-800">QR đã chọn</p>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  Bank QR: {bankQrFiles.length || 0} · E-wallet QR:{" "}
+                  {ewalletQrFiles.length || 0}
                 </p>
+              </div>
+
+              <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+
+              <div>
+                <p className="font-semibold text-gray-800">Tọa độ (nếu có)</p>
                 {lat && lng ? (
                   <p className="mt-0.5 font-mono text-[11px] text-gray-700">
                     lat: {lat} · lng: {lng}
@@ -1014,14 +1628,18 @@ export default function RestaurantsTab() {
               <span className="inline-flex items-center rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
                 Khoảng giá: {createdRestaurant.priceRange || "$$"}
               </span>
-              <span className="text-xs text-gray-500">
-                Trạng thái:{" "}
-                {createdRestaurant.isActive ? (
-                  <span className="font-medium text-emerald-600">Hoạt động</span>
-                ) : (
-                  <span className="font-medium text-gray-500">Tạm ẩn</span>
-                )}
-              </span>
+              {"isActive" in createdRestaurant && (
+                <span className="text-xs text-gray-500">
+                  Trạng thái:{" "}
+                  {createdRestaurant.isActive ? (
+                    <span className="font-medium text-emerald-600">
+                      Hoạt động
+                    </span>
+                  ) : (
+                    <span className="font-medium text-gray-500">Tạm ẩn</span>
+                  )}
+                </span>
+              )}
             </div>
           </div>
 
@@ -1058,14 +1676,6 @@ export default function RestaurantsTab() {
                 <div className="text-xs text-gray-600">
                   <p className="font-medium text-gray-800">Địa chỉ</p>
                   <p className="line-clamp-2">{fullAddressPreview}</p>
-                  {Array.isArray(createdRestaurant.searchTerms) &&
-                    createdRestaurant.searchTerms.length > 0 && (
-                      <p className="mt-1 text-[11px] text-gray-400">
-                        Từ khóa tìm kiếm:{" "}
-                        {createdRestaurant.searchTerms.slice(0, 4).join(", ")}
-                        {createdRestaurant.searchTerms.length > 4 && "…"}
-                      </p>
-                    )}
                 </div>
               </div>
             </div>
@@ -1076,24 +1686,28 @@ export default function RestaurantsTab() {
                 <p className="font-semibold text-gray-800">
                   Thông tin hệ thống
                 </p>
-                <p className="mt-1 text-gray-600">
-                  Owner ID:{" "}
-                  <span className="font-mono text-[11px]">
-                    {createdRestaurant.ownerId}
-                  </span>
-                </p>
+                {createdRestaurant.ownerId && (
+                  <p className="mt-1 text-gray-600">
+                    Owner ID:{" "}
+                    <span className="font-mono text-[11px]">
+                      {createdRestaurant.ownerId}
+                    </span>
+                  </p>
+                )}
                 <p className="mt-0.5 text-gray-600">
                   Category ID:{" "}
                   <span className="font-mono text-[11px]">
                     {createdRestaurant.categoryId}
                   </span>
                 </p>
-                <p className="mt-0.5 text-gray-600">
-                  Slug:{" "}
-                  <span className="font-mono text-[11px]">
-                    {createdRestaurant.slug}
-                  </span>
-                </p>
+                {createdRestaurant.slug && (
+                  <p className="mt-0.5 text-gray-600">
+                    Slug:{" "}
+                    <span className="font-mono text-[11px]">
+                      {createdRestaurant.slug}
+                    </span>
+                  </p>
+                )}
               </div>
 
               <div className="h-px w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
@@ -1102,7 +1716,7 @@ export default function RestaurantsTab() {
                 <div>
                   <p className="font-semibold text-gray-800">Giờ mở cửa</p>
                   <ul className="mt-1 space-y-0.5">
-                    {createdRestaurant.openingHours.map((oh) => (
+                    {createdRestaurant.openingHours.map((oh: any) => (
                       <li
                         key={oh.day}
                         className="flex items-center justify-between"
@@ -1119,7 +1733,8 @@ export default function RestaurantsTab() {
                           <span className="text-[11px] text-gray-600">
                             {oh.periods
                               .map(
-                                (p) => `${p.opens ?? "?"} – ${p.closes ?? "?"}`,
+                                (p: any) =>
+                                  `${p.opens ?? "?"} – ${p.closes ?? "?"}`
                               )
                               .join(", ")}
                           </span>
@@ -1138,46 +1753,39 @@ export default function RestaurantsTab() {
 
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="space-y-0.5">
-                  <p className="font-semibold text-gray-800">
-                    Tọa độ & rating
-                  </p>
+                  <p className="font-semibold text-gray-800">Tọa độ & rating</p>
                   <p className="text-[11px] text-gray-600">
                     lng:{" "}
                     {createdRestaurant.address.coordinates?.[0]?.toFixed
                       ? createdRestaurant.address.coordinates[0].toFixed(6)
                       : createdRestaurant.address.coordinates?.[0]}
-                    {" · "}
-                    lat:{" "}
+                    {" · "}lat:{" "}
                     {createdRestaurant.address.coordinates?.[1]?.toFixed
                       ? createdRestaurant.address.coordinates[1].toFixed(6)
                       : createdRestaurant.address.coordinates?.[1]}
                   </p>
-                  <p className="text-[11px] text-gray-600">
-                    Rating:{" "}
-                    {createdRestaurant.rating != null
-                      ? createdRestaurant.rating.toFixed
+                  {createdRestaurant.rating != null && (
+                    <p className="text-[11px] text-gray-600">
+                      Rating:{" "}
+                      {createdRestaurant.rating.toFixed
                         ? createdRestaurant.rating.toFixed(1)
-                        : createdRestaurant.rating
-                      : "Chưa có đánh giá"}
-                  </p>
+                        : createdRestaurant.rating}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right text-[11px] text-gray-500">
-                  <p>
-                    Tạo lúc:{" "}
-                    {createdRestaurant.createdAt
-                      ? new Date(
-                          createdRestaurant.createdAt as unknown as string,
-                        ).toLocaleString()
-                      : ""}
-                  </p>
-                  <p>
-                    Cập nhật:{" "}
-                    {createdRestaurant.updatedAt
-                      ? new Date(
-                          createdRestaurant.updatedAt as unknown as string,
-                        ).toLocaleString()
-                      : ""}
-                  </p>
+                  {createdRestaurant.createdAt && (
+                    <p>
+                      Tạo lúc:{" "}
+                      {new Date(createdRestaurant.createdAt).toLocaleString()}
+                    </p>
+                  )}
+                  {createdRestaurant.updatedAt && (
+                    <p>
+                      Cập nhật:{" "}
+                      {new Date(createdRestaurant.updatedAt).toLocaleString()}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

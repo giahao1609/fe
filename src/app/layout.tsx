@@ -77,10 +77,7 @@ export const metadata: Metadata = {
     ],
   },
   icons: {
-    icon: [
-      { url: "/favicon.ico" },
-      { url: "/icon.png", type: "image/png" },
-    ],
+    icon: [{ url: "/favicon.ico" }, { url: "/icon.png", type: "image/png" }],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
   robots: {
@@ -105,7 +102,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="vi" >
       <head>
         <Script
           src="https://kit.fontawesome.com/3e8a49db6c.js"
@@ -119,7 +116,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <meta name="theme-color" content="#ffffff" />
       </head>
 
-      <body className="min-h-screen bg-white text-gray-900 antialiased flex flex-col [--sat:env(safe-area-inset-top)] [--sab:env(safe-area-inset-bottom)]">
+      <body suppressHydrationWarning={true} className="min-h-screen bg-white text-gray-900 antialiased flex flex-col [--sat:env(safe-area-inset-top)] [--sab:env(safe-area-inset-bottom)]">
         <AuthProvider>
           {children}
 

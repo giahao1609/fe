@@ -9,7 +9,7 @@ type Food = {
   rating?: number;
 };
 
-export default function FoodNearbyList({ foods }: { foods: Food[] }) {
+export default function FoodNearbyList({ foods }: { foods: any[] }) {
   return (
     <div className="-mx-4 overflow-x-auto px-4">
       <div className="flex gap-4">
@@ -43,7 +43,7 @@ export default function FoodNearbyList({ foods }: { foods: Food[] }) {
               <div className="mt-2 flex items-center justify-between">
                 <div className="text-sm">
                   <span className="font-semibold text-rose-700">
-                    {f.price.toLocaleString()}đ
+                    {f?.price?.toLocaleString()}đ
                   </span>
                 </div>
                 <button className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 hover:border-rose-300 hover:text-rose-700">

@@ -44,16 +44,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!cookieToken) {
       setUser(null);
       setToken(null);
+      ApiService.setToken(null);
       return;
     }
 
     ApiService.setToken(cookieToken);
     setToken(cookieToken);
 
-    const me = await AuthService.me();
-    if (me) {
-      setUser(me);
-    } else {
+    try {
+      const me = await AuthService.me();
+      setUser(me || null);
+    } catch {
       setUser(null);
     }
   };
@@ -63,6 +64,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       await reloadUser();
       setHydrated(true);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const login = async (accessToken: string, userFromApi?: AuthUser | null) => {
@@ -74,15 +76,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (userFromApi) {
       setUser(userFromApi);
     } else {
-      const me = await AuthService.me();
-      setUser(me);
+      try {
+        const me = await AuthService.me();
+        setUser(me || null);
+      } catch {
+        setUser(null);
+      }
     }
   };
 
   const logout = () => {
-    AuthService.logout(); 
+    AuthService.logout();
     setUser(null);
     setToken(null);
+    ApiService.setToken(null);
 
     if (isBrowser) {
       window.location.href = "/auth";
@@ -90,6 +97,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   if (!hydrated && isBrowser) {
+    // tránh flicker/hydration issue trên client
     return null;
   }
 

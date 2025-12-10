@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 const NAV_LINKS = [
   { href: "/categories/nearby", label: "Gần bạn" },
   { href: "/categories/restaurants", label: "Quán ăn" },
+  { href: "/categories/deals", label: "Món ăn" },
   { href: "/categories/blog", label: "Blog" },
 ];
 
@@ -16,7 +17,7 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-
+  console.log("user", user)
   const [open, setOpen] = useState(false);
   const [elevated, setElevated] = useState(false);
   const [navH, setNavH] = useState(76);
@@ -44,6 +45,15 @@ export default function Navbar() {
     setOpen(false);
     setAccountMenuOpen(false);
   };
+  const handleMyOrdersClick = () => {
+    if (!user) {
+      router.push("/auth");
+      return;
+    }
+    router.push("/me/pre-orders");
+    setAccountMenuOpen(false);
+    setOpen(false);
+  };
 
   const handleDashboardClick = () => {
     if (!user) {
@@ -67,6 +77,16 @@ export default function Navbar() {
       return;
     }
     router.push("/owner/restaurants/new");
+    setAccountMenuOpen(false);
+    setOpen(false);
+  };
+
+  const handleMyBlogClick = () => {
+    if (!user) {
+      router.push("/auth");
+      return;
+    }
+    router.push("/me/blogs");
     setAccountMenuOpen(false);
     setOpen(false);
   };
@@ -203,7 +223,10 @@ export default function Navbar() {
             </button>
 
             {user ? (
-              <div className="relative flex items-center gap-2" ref={accountRef}>
+              <div
+                className="relative flex items-center gap-2"
+                ref={accountRef}
+              >
                 {/* Greeting text */}
                 <button
                   onClick={handleAccountClick}
@@ -211,9 +234,7 @@ export default function Navbar() {
                   title={displayName || (user as any)?.email}
                 >
                   Xin chào,{" "}
-                  {displayName ||
-                    (user as any)?.email?.split("@")[0] ||
-                    "bạn"}
+                  {displayName || (user as any)?.email?.split("@")[0] || "bạn"}
                 </button>
 
                 {/* Avatar + dropdown trigger */}
@@ -245,27 +266,49 @@ export default function Navbar() {
                       </p>
                     </div>
                     <div className="my-1 h-px bg-gray-100" />
+
                     <button
-                      onClick={handleAccountClick}
+                      onClick={handleMyOrdersClick}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-800 hover:bg-gray-50"
                     >
                       <span className="text-[16px]">👤</span>
                       <span>Thông tin tài khoản</span>
                     </button>
+
                     <button
+                      onClick={handleMyOrdersClick}
+                      className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
+                    >
+                      <span className="text-[16px]">✍️</span>
+                      <span>Đơn hàng</span>
+                    </button>
+
+                    <button
+                      onClick={handleMyBlogClick}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-800 hover:bg-gray-50"
+                    >
+                      <span className="text-[16px]">✍️</span>
+                      <span>Blog của tôi</span>
+                    </button>
+
+                    {/* <button
                       onClick={handleCreateRestaurantClick}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-rose-700 hover:bg-rose-50"
                     >
                       <span className="text-[16px]">➕</span>
                       <span>Đăng quán</span>
-                    </button>
-                    <button
-                      onClick={handleDashboardClick}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-800 hover:bg-gray-50"
-                    >
-                      <span className="text-[16px]">📊</span>
-                      <span>Dashboard</span>
-                    </button>
+                    </button> */}
+
+                    {(roles.includes("owner") || roles.includes("admin")) && (
+                      <button
+                        onClick={handleDashboardClick}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-800 hover:bg-gray-50"
+                      >
+                        <span className="text-[16px]">📊</span>
+                        <span>Dashboard</span>
+                      </button>
+                    )}
+
                     <div className="my-1 h-px bg-gray-100" />
                     <button
                       onClick={() => {
@@ -324,7 +367,9 @@ export default function Navbar() {
         {/* Mobile drawer */}
         <div
           className={`lg:hidden fixed left-0 right-0 z-40 transition-[max-height,opacity] duration-250 ${
-            open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+            open
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none opacity-0"
           }`}
           style={{
             top: `calc(var(--nav-h) + env(safe-area-inset-top))`,
@@ -379,15 +424,24 @@ export default function Navbar() {
                   </button>
                 </div>
 
-                {/* Quản lý quán trong "dropdown" mobile */}
+                {/* Quản lý trong mobile */}
                 <div className="mt-3 grid gap-2 px-1">
                   <button
+                    onClick={handleMyBlogClick}
+                    className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
+                  >
+                    <span className="text-[16px]">✍️</span>
+                    <span>Blog của tôi</span>
+                  </button>
+
+                  {/* <button
                     onClick={handleCreateRestaurantClick}
                     className="flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
                   >
                     <span className="text-[16px]">➕</span>
                     <span>Đăng quán mới</span>
-                  </button>
+                  </button> */}
+
                   <button
                     onClick={() => {
                       handleDashboardClick();
@@ -398,6 +452,7 @@ export default function Navbar() {
                     <span className="text-[16px]">📊</span>
                     <span>Dashboard</span>
                   </button>
+
                   <button
                     onClick={() => {
                       logout();

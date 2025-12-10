@@ -63,7 +63,7 @@ export default function CommentModerationTab() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold">Duyệt bình luận</h3>
+        <h3 className="font-semibold">Bình luận</h3>
         <div className="flex items-center gap-2">
           {(["all", "pending", "approved", "rejected"] as const).map((k) => (
             <Button

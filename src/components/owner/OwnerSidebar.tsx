@@ -1,8 +1,7 @@
 "use client";
 
+import { OwnerTab } from "@/app/dashboard/owner/page";
 import React from "react";
-
-export type OwnerTab = "overview" | "store" | "comments" | "posts" | "restaurants"|"menu";
 
 export default function OwnerSidebar({
   active,
@@ -55,20 +54,31 @@ export default function OwnerSidebar({
           label="Bình luận"
           icon={<i className="fa-regular fa-comments" />}
         />
-        <Item
+        {/* <Item
           id="posts"
           label="Bài viết liên quan"
           icon={<i className="fa-regular fa-newspaper" />}
-        />
-        <Item
+        /> */}
+        {/* <Item
           id="restaurants"
           label="Đăng quán / Nhà hàng"
           icon={<i className="fa-solid fa-utensils" />}
-        />
+        /> */}
         <Item
           id="menu"
           label="Menu"
           icon={<i className="fa-solid fa-utensils" />}
+        />
+        {/* <Item
+          id="blogs"
+          label="Blog của tôi"
+          icon={<i className="fa-solid fa-blog" />}
+        /> */}
+
+        <Item
+          id="order"
+          label="Order"
+          icon={<i className="fa-solid fa-receipt" />}
         />
       </nav>
 

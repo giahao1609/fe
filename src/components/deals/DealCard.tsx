@@ -28,7 +28,7 @@ export default function DealCard({ deal }: { deal: Deal }) {
 
   return (
     <article className="group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:shadow-md">
-      <Link href={`/restaurants/${deal._id}`} className="block relative">
+      <Link href={`/categories/restaurants/${deal._id}`} className="block relative">
         <div className="relative aspect-[4/3] w-full">
           <Image
             src={img}
