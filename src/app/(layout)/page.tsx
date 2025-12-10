@@ -852,7 +852,7 @@ export default function Home() {
 
         {!featuredLoading && featured.length > 0 && (
           <div className="grid gap-4 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {featured.map((r) => {
+            {featured.map((r:any) => {
               const cover =
                 r.coverImageUrlSigned ??
                 (r.coverImageUrl
@@ -863,7 +863,7 @@ export default function Home() {
               return (
                 <Link
                   key={r.id}
-                  href={`/restaurants/${r.slug}`}
+                  href={`/categories/restaurants/${r._id}`}
                   className="group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
                 >
                   <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
