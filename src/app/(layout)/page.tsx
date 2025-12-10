@@ -965,7 +965,7 @@ export default function Home() {
               return (
                 <Link
                   key={d._id}
-                  href={`/deals/${d.slug}`}
+                  href={`/categories/restaurants/${d._id}`}
                   className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
                 >
                   <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-gray-100">
@@ -1066,7 +1066,7 @@ export default function Home() {
                 return (
                   <Link
                     key={p._id}
-                    href={`/categories/blog/${p.slug}`}
+                    href={`/categories/blog/${p._id}`}
                     className="group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
                   >
                     <div className="relative aspect-video w-full bg-gray-100">
