@@ -118,10 +118,7 @@ export default function MenuItemsDemoTab() {
     setLoadingRestaurants(true);
     setRestaurantsError(null);
     try {
-      const res = await RestaurantService.listRestaurants({
-        page: 1,
-        limit: 999, // lấy tất cả quán của owner
-      });
+      const res = await RestaurantService.getByOwner();
       setRestaurants(res.items);
 
       // nếu chưa chọn quán nào và có quán => tự chọn quán đầu tiên

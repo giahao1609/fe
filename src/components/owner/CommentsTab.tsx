@@ -215,7 +215,7 @@ export default function CommentsTab() {
 
     setActionLoading(true);
     try {
-      await axios.patch(
+      await axios.post(
         `${API_BASE}/owner/restaurants/${currentRestaurantId}/reviews/${reviewId}/reply`,
         { reply },
         {
