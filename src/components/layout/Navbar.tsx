@@ -13,18 +13,60 @@ const NAV_LINKS = [
   { href: "/categories/blog", label: "Blog" },
 ];
 
+// dùng chung với chỗ khác nếu muốn
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.food-map.online";
+
+// gợi ý từ khóa
+const HOT_KEYWORDS = [
+  "Phở",
+  "Bún bò",
+  "Cơm tấm",
+  "Trà sữa",
+  "Pizza",
+  "Bánh mì",
+];
+
+type SearchMenuItem = {
+  _id: string;
+  name: string;
+  slug?: string;
+  description?: string;
+
+  // ảnh
+  images?: string[];
+  imagesSigned?: { url: string; path: string }[];
+
+  basePrice?: {
+    currency: string;
+    amount: number;
+  };
+
+  // tùy backend có hay không
+  restaurantId?: string;
+  restaurantName?: string;
+  restaurantSlug?: string;
+};
+
 export default function Navbar() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  console.log("user", user)
   const [open, setOpen] = useState(false);
   const [elevated, setElevated] = useState(false);
   const [navH, setNavH] = useState(76);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
+  // SEARCH overlay state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchMenuItem[]>([]);
+
   const headerRef = useRef<HTMLElement | null>(null);
   const accountRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const avatarSrc =
     (user as any)?.avatarUrl ||
@@ -45,6 +87,7 @@ export default function Navbar() {
     setOpen(false);
     setAccountMenuOpen(false);
   };
+
   const handleMyOrdersClick = () => {
     if (!user) {
       router.push("/auth");
@@ -69,16 +112,6 @@ export default function Navbar() {
       router.push("/account");
     }
     setAccountMenuOpen(false);
-  };
-
-  const handleCreateRestaurantClick = () => {
-    if (!user) {
-      router.push("/auth");
-      return;
-    }
-    router.push("/owner/restaurants/new");
-    setAccountMenuOpen(false);
-    setOpen(false);
   };
 
   const handleMyBlogClick = () => {
@@ -138,6 +171,88 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [accountMenuOpen]);
 
+  // khóa scroll khi mở search overlay
+  useEffect(() => {
+    if (searchOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [searchOpen]);
+
+  // ESC để đóng search
+  useEffect(() => {
+    if (!searchOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeSearch();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [searchOpen]);
+
+  // debounce gọi API search
+  useEffect(() => {
+    if (!searchOpen) return;
+
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      setSearchError(null);
+      setSearchLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      try {
+        setSearchLoading(true);
+        setSearchError(null);
+
+        const url = `${API_BASE}/api/v1/menu-items/search?q=${encodeURIComponent(
+          q,
+        )}`;
+
+        const res = await fetch(url, {
+          method: "GET",
+          credentials: "include",
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Search failed: ${res.status}`);
+        }
+
+        const json = await res.json();
+
+        // cố gắng bắt nhiều format trả về khác nhau
+        let items: any[] = [];
+        if (Array.isArray(json.items)) items = json.items;
+        else if (Array.isArray(json.data?.items)) items = json.data.items;
+        else if (Array.isArray(json.data)) items = json.data;
+        else if (Array.isArray(json)) items = json;
+
+        setSearchResults(items as SearchMenuItem[]);
+      } catch (err: any) {
+        if (err.name === "AbortError") return;
+        console.error("Search menu-items error:", err);
+        setSearchError("Không tìm được kết quả, vui lòng thử lại.");
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeout);
+    };
+  }, [searchQuery, searchOpen]);
+
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
     return pathname?.startsWith(href);
@@ -160,6 +275,47 @@ export default function Navbar() {
         />
       </Link>
     );
+  };
+
+  const openSearchOverlay = () => {
+    setSearchOpen(true);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSearchError(null);
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 10);
+  };
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSearchError(null);
+    setSearchLoading(false);
+  };
+
+  const getItemImageSrc = (item: SearchMenuItem): string => {
+    const signed = item.imagesSigned?.[0]?.url;
+    if (signed) return signed;
+
+    const rawPath = item.images?.[0];
+    if (rawPath) {
+      return `https://storage.googleapis.com/khoaluaniuh/${rawPath}`;
+    }
+    return "/image/placeholder-food.jpg"; // thêm ảnh placeholder nếu có
+  };
+
+  const handleResultClick = (item: SearchMenuItem) => {
+    // tuỳ backend: ưu tiên đi tới trang quán
+    if (item.restaurantSlug) {
+      router.push(`/categories/restaurants/${item.restaurantSlug}`);
+    } else if (item.restaurantId) {
+      router.push(`/categories/restaurants/${item.restaurantId}`);
+    } else if (item.slug) {
+      router.push(`/menu-items/${item.slug}`);
+    }
+    closeSearch();
   };
 
   return (
@@ -200,10 +356,9 @@ export default function Navbar() {
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            {/* Search pill (desktop) */}
             <button
-              onClick={() => router.push("/search")}
-              className="hidden items-center gap-2 rounded-full border border-gray-300/80 bg-white/70 px-3 py-1.5 text-sm text-gray-600 shadow-sm transition hover:bg-white hover:text-gray-800 sm:flex"
+              onClick={openSearchOverlay}
+              className="hidden items-center gap-2 rounded-full border border-gray-300/80 bg-white/70 px-3 py-3 text-sm text-gray-600 shadow-sm transition hover:bg-gray-100 hover:text-gray-800 sm:flex"
               title="Tìm món, quán gần bạn"
             >
               <svg
@@ -216,10 +371,6 @@ export default function Navbar() {
                 <circle cx="11" cy="11" r="7" />
                 <path d="M20 20l-3-3" />
               </svg>
-              <span className="hidden md:inline">Tìm món, quán gần bạn…</span>
-              <kbd className="ml-1 hidden rounded border border-gray-300 bg-gray-100 px-1.5 text-[10px] text-gray-600 md:inline">
-                /
-              </kbd>
             </button>
 
             {user ? (
@@ -268,7 +419,7 @@ export default function Navbar() {
                     <div className="my-1 h-px bg-gray-100" />
 
                     <button
-                      onClick={handleMyOrdersClick}
+                      onClick={handleAccountClick}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-gray-800 hover:bg-gray-50"
                     >
                       <span className="text-[16px]">👤</span>
@@ -279,7 +430,7 @@ export default function Navbar() {
                       onClick={handleMyOrdersClick}
                       className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
                     >
-                      <span className="text-[16px]">✍️</span>
+                      <span className="text-[16px]">🧾</span>
                       <span>Đơn hàng</span>
                     </button>
 
@@ -290,14 +441,6 @@ export default function Navbar() {
                       <span className="text-[16px]">✍️</span>
                       <span>Blog của tôi</span>
                     </button>
-
-                    {/* <button
-                      onClick={handleCreateRestaurantClick}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-rose-700 hover:bg-rose-50"
-                    >
-                      <span className="text-[16px]">➕</span>
-                      <span>Đăng quán</span>
-                    </button> */}
 
                     {(roles.includes("owner") || roles.includes("admin")) && (
                       <button
@@ -427,20 +570,23 @@ export default function Navbar() {
                 {/* Quản lý trong mobile */}
                 <div className="mt-3 grid gap-2 px-1">
                   <button
+                    onClick={() => {
+                      handleMyOrdersClick();
+                      setOpen(false);
+                    }}
+                    className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
+                  >
+                    <span className="text-[16px]">🧾</span>
+                    <span>Đơn hàng</span>
+                  </button>
+
+                  <button
                     onClick={handleMyBlogClick}
                     className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm text-gray-800 hover:bg-gray-100"
                   >
                     <span className="text-[16px]">✍️</span>
                     <span>Blog của tôi</span>
                   </button>
-
-                  {/* <button
-                    onClick={handleCreateRestaurantClick}
-                    className="flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100"
-                  >
-                    <span className="text-[16px]">➕</span>
-                    <span>Đăng quán mới</span>
-                  </button> */}
 
                   <button
                     onClick={() => {
@@ -477,6 +623,149 @@ export default function Navbar() {
         </div>
       </header>
 
+      {/* Search overlay fixed kiểu Coolmate */}
+      {searchOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 px-4 pt-[10vh]"
+          onClick={closeSearch}
+        >
+           <div
+              className="flex max-h-[80vh] w-full max-w-4xl flex-col rounded-3xl bg-white shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 border-b px-6 py-4">
+              <div className="flex flex-1 items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-2">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5 text-gray-500"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="M20 20l-3-3" />
+                </svg>
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Tìm món, quán gần bạn…"
+                  className="flex-1 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+                />
+              </div>
+              <button
+                onClick={closeSearch}
+                className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
+              >
+                ✕
+              </button>
+            </div>
+
+             <div className="flex-1 overflow-y-auto px-6 py-4">
+              {!searchQuery.trim() && (
+                <>
+                  <div className="mb-3 text-sm font-semibold text-gray-800">
+                    Từ khóa nổi bật hôm nay
+                  </div>
+                  <div className="mb-6 flex flex-wrap gap-2">
+                    {HOT_KEYWORDS.map((kw) => (
+                      <button
+                        key={kw}
+                        onClick={() => setSearchQuery(kw)}
+                        className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-700 hover:border-rose-500 hover:bg-rose-50 hover:text-rose-700"
+                      >
+                        {kw}
+                      </button>
+                    ))}
+                  </div>
+
+                  
+                </>
+              )}
+
+              {searchQuery.trim() && searchLoading && (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, idx) => (
+                    <div
+                      key={idx}
+                      className="flex flex-col overflow-hidden rounded-2xl bg-gray-50"
+                    >
+                      <div className="h-32 animate-pulse bg-gray-100" />
+                      <div className="space-y-2 p-3">
+                        <div className="h-4 w-2/3 animate-pulse rounded bg-gray-100" />
+                        <div className="h-3 w-1/2 animate-pulse rounded bg-gray-100" />
+                        <div className="h-3 w-1/3 animate-pulse rounded bg-gray-100" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* lỗi */}
+              {searchQuery.trim() && searchError && !searchLoading && (
+                <p className="text-xs text-red-600">{searchError}</p>
+              )}
+
+              {/* kết quả */}
+              {searchQuery.trim() &&
+                !searchLoading &&
+                !searchError &&
+                (searchResults.length > 0 ? (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {searchResults.map((item) => (
+                      <button
+                        key={item._id}
+                        onClick={() => handleResultClick(item)}
+                        className="flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                      >
+                        <div className="relative h-32 w-full bg-gray-50">
+                          <Image
+                            src={getItemImageSrc(item)}
+                            alt={item.name}
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
+                        <div className="flex flex-1 flex-col gap-1 p-3">
+                          <div className="line-clamp-2 text-sm font-semibold text-gray-900">
+                            {item.name}
+                          </div>
+                          {item.description && (
+                            <div className="line-clamp-2 text-xs text-gray-500">
+                              {item.description}
+                            </div>
+                          )}
+                          <div className="mt-1 flex items-baseline justify-between gap-2">
+                            {item.basePrice && (
+                              <div className="text-sm font-semibold text-emerald-700">
+                                {item.basePrice.amount.toLocaleString("vi-VN")}{" "}
+                                {item.basePrice.currency}
+                              </div>
+                            )}
+                            {item.restaurantName && (
+                              <div className="truncate text-[11px] text-gray-500">
+                                {item.restaurantName}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  !searchLoading && (
+                    <p className="text-xs text-gray-500">
+                      Không tìm thấy món phù hợp. Thử từ khóa khác nhé.
+                    </p>
+                  )
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* spacer cho mobile */}
       <div
         aria-hidden
         className="lg:hidden"
