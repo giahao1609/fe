@@ -58,7 +58,7 @@ export default function OverviewTab() {
       {/* Charts */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* Bình luận 14 ngày */}
-        <div className="rounded-2xl bg-white border border-gray-200 shadow-sm p-5">
+        {/* <div className="rounded-2xl bg-white border border-gray-200 shadow-sm p-5">
           <div className="text-sm font-semibold mb-3">📈 Bình luận theo ngày (14d)</div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -90,7 +90,7 @@ export default function OverviewTab() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </div> */}
       </div>
 
       
