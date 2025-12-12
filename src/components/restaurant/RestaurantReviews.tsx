@@ -19,7 +19,7 @@ interface Props {
   getImageUrl: (path?: string) => string;
 }
 
-const DEFAULT_AVATAR = "https://avatar.iran.liara.run/public";
+const DEFAULT_AVATAR = "https://www.food-map.online/image/default-avatar.jpg";
 
 export default function RestaurantReviews({
   id,
