@@ -64,8 +64,8 @@ export default function CommentModerationTab() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">Bình luận</h3>
-        <div className="flex items-center gap-2">
-          {(["all", "pending", "approved", "rejected"] as const).map((k) => (
+        {/* <div className="flex items-center gap-2">
+          {(["all", "active", "remote", "rejected"] as const).map((k) => (
             <Button
               key={k}
               variant={filter === k ? "default" : "outline"}
@@ -75,7 +75,7 @@ export default function CommentModerationTab() {
               {k}
             </Button>
           ))}
-        </div>
+        </div> */}
       </div>
 
       <Table>
@@ -85,7 +85,6 @@ export default function CommentModerationTab() {
             <TableHead>User</TableHead>
             <TableHead>Nội dung</TableHead>
             <TableHead>Ngày</TableHead>
-            <TableHead>Trạng thái</TableHead>
             <TableHead className="text-right">Hành động</TableHead>
           </TableRow>
         </TableHeader>
@@ -97,11 +96,7 @@ export default function CommentModerationTab() {
                 <TableCell>{c.user}</TableCell>
                 <TableCell className="max-w-[360px] truncate">{c.content}</TableCell>
                 <TableCell>{new Date(c.createdAt).toLocaleString()}</TableCell>
-                <TableCell>
-                  {c.status === "approved" && <span className="text-emerald-600">Approved</span>}
-                  {c.status === "pending" && <span className="text-amber-600">Pending</span>}
-                  {c.status === "rejected" && <span className="text-red-600">Rejected</span>}
-                </TableCell>
+               
                 <TableCell className="flex gap-2 justify-end">
                   <Button size="sm" variant="destructive" onClick={() => remove(c.id)}>
                     Ẩn
