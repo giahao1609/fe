@@ -73,7 +73,7 @@ export const PreOrderService = {
   },
 
   async getById(id: string) {
-    return ApiService.get<PreOrder>(`/pre-orders/restaurant/${id}`);
+    return ApiService.get<PreOrder>(`/pre-orders/restaurant${id}`);
   },
 
   async requestDeposit(id: string, payload: RequestDepositPayload) {

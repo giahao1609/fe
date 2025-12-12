@@ -229,7 +229,7 @@ export function OwnerPreOrder() {
         const data = await PreOrderService.listForRestaurant(selectedRestaurantId);
         if (!cancelled) {
           setOrders(data || []);
-
+          console.log("data",data)
           if (!data || data.length === 0) {
             setSelectedOrderId(null);
             setSelectedOrder(null);
@@ -247,6 +247,7 @@ export function OwnerPreOrder() {
               setSelectedOrder(stillExist); // sync lại selectedOrder từ list
             } else {
               setSelectedOrderId(data[0]._id);
+              
               setSelectedOrder(data[0]);
             }
           }
@@ -269,40 +270,41 @@ export function OwnerPreOrder() {
   }, [selectedRestaurantId]);
 
   // ================== LOAD ORDER DETAIL (OPTIONAL REFRESH) ==================
-  useEffect(() => {
-    if (!selectedOrderId) {
-      setSelectedOrder(null);
-      return;
-    }
+  // useEffect(() => {
+  //   if (!selectedOrderId) {
+  //     setSelectedOrder(null);
+  //     return;
+  //   }
 
-    let cancelled = false;
+  //   let cancelled = false;
 
-    const loadDetail = async () => {
-      setLoadingDetail(true);
-      try {
-        const data = await PreOrderService.getById(selectedOrderId);
-        if (!cancelled && data) {
-          // refresh lại detail nếu API trả thêm field (items, notes, deposit,...)
-          setSelectedOrder(data);
-        }
-      } catch (e: any) {
-        console.error("[OwnerPreOrder] load detail error:", e);
-        if (!cancelled) {
-          // Không clear selectedOrder, vẫn dùng data từ list
-          NotifyService.error(e?.message || "Không thể tải chi tiết đơn.");
-        }
-      } finally {
-        if (!cancelled) setLoadingDetail(false);
-      }
-    };
+  //   const loadDetail = async () => {
+  //     setLoadingDetail(true);
+  //     try {
+  //       const data = await PreOrderService.getById(selectedOrderId) as any;
+  //       console.log("1data", data)
+  //       if (!cancelled && data) {
+  //         // refresh lại detail nếu API trả thêm field (items, notes, deposit,...)
+  //         setSelectedOrder(data[0]);
+  //       }
+  //     } catch (e: any) {
+  //       console.error("[OwnerPreOrder] load detail error:", e);
+  //       if (!cancelled) {
+  //         // Không clear selectedOrder, vẫn dùng data từ list
+  //         NotifyService.error(e?.message || "Không thể tải chi tiết đơn.");
+  //       }
+  //     } finally {
+  //       if (!cancelled) setLoadingDetail(false);
+  //     }
+  //   };
 
-    // tùy ông: có thể bỏ luôn call này nếu list đã đủ detail
-    loadDetail();
+  //   // tùy ông: có thể bỏ luôn call này nếu list đã đủ detail
+  //   loadDetail();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedOrderId]);
+  //   return () => {
+  //     cancelled = true;
+  //   };
+  // }, [selectedOrderId]);
 
   // ================== FILTERED ORDERS ==================
   const filteredOrders = useMemo(() => {
@@ -690,7 +692,7 @@ export function OwnerPreOrder() {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-semibold text-gray-900">
-                      Đơn #{selectedOrder._id.slice(-6)}
+                      Đơn #{selectedOrder._id?.slice(-6)}
                     </h3>
                     <span
                       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
