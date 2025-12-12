@@ -189,7 +189,7 @@ export default function RestaurantReviews({
                   className="relative w-full aspect-square rounded overflow-hidden"
                 >
                   <Image
-                    src={src}
+                    src={DEFAULT_AVATAR}
                     alt={`preview-${i}`}
                     fill
                     className="object-cover"
@@ -270,7 +270,7 @@ export default function RestaurantReviews({
                           className="relative w-full aspect-square rounded overflow-hidden"
                         >
                           <Image
-                            src={getImageUrl(img)}
+                            src={DEFAULT_AVATAR}
                             alt={`rv-${i}`}
                             fill
                             className="object-cover"
