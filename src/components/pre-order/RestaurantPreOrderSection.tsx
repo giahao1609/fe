@@ -3,6 +3,7 @@ import {  PreOrderMenuItem } from "@/app/(layout)/categories/restaurants/[id]/pr
 import { NotifyService } from "@/services/notify.service";
 import { PreOrderService } from "@/services/pre-order.service";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 export type CartItem = {
   menuItemId: string;
@@ -51,7 +52,7 @@ export function  RestaurantPreOrderSection({
   const menuItems: PreOrderMenuItem[] = Array.isArray(rawMenuItems)
     ? rawMenuItems
     : [];
-
+  const router = useRouter();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [guestCount, setGuestCount] = useState(2);
   const [arrivalTime, setArrivalTime] = useState(""); // datetime-local
@@ -172,6 +173,8 @@ export function  RestaurantPreOrderSection({
       NotifyService.success("Gửi yêu cầu đặt bàn thành công!");
       clearCart();
       setNote("");
+            router.push("/me/pre-orders");
+
     } catch (err: any) {
       console.error(err);
       NotifyService.error(
