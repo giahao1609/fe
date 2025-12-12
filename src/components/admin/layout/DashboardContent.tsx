@@ -46,7 +46,7 @@ export default function DashboardContent() {
       const files = await getFiles();
 
       // Fake số liệu
-      const users = 1287;
+      const users = 12;
       const reviews = Math.max(
         35,
         Math.round(restaurants.length * 12 + Math.random() * 40)
@@ -108,7 +108,7 @@ export default function DashboardContent() {
         <SoftCard
           icon={<i className="fa-solid fa-blog"></i>}
           title="Blog"
-          value="22"
+          value="8"
           color="from-cyan-400 to-cyan-600"
         />{" "}
       </div>
