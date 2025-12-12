@@ -103,14 +103,8 @@ export default function CommentModerationTab() {
                   {c.status === "rejected" && <span className="text-red-600">Rejected</span>}
                 </TableCell>
                 <TableCell className="flex gap-2 justify-end">
-                  <Button size="sm" variant="outline" onClick={() => updateStatus(c.id, "approved")}>
-                    Duyệt
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => updateStatus(c.id, "rejected")}>
-                    Từ chối
-                  </Button>
                   <Button size="sm" variant="destructive" onClick={() => remove(c.id)}>
-                    Xoá
+                    Ẩn
                   </Button>
                 </TableCell>
               </TableRow>
