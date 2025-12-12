@@ -52,7 +52,7 @@ export default function OverviewTab() {
         <Card title="Tổng bình luận" value={`${snapshot.totalComments}`} desc="Bao gồm đã duyệt & chờ duyệt" />
         <Card title="Đang chờ duyệt" value={`${snapshot.pendingComments}`} desc="Bình luận chưa công khai" />
         <Card title="Điểm trung bình" value={`${snapshot.avgRating.toFixed(1)}`} desc="Từ bình luận đã duyệt" />
-        <Card title="Bài viết liên quan" value={`${snapshot.totalPosts}`} desc="Bài blog về cửa hàng" />
+        {/* <Card title="Bài viết liên quan" value={`${snapshot.totalPosts}`} desc="Bài blog về cửa hàng" /> */}
       </div>
 
       {/* Charts */}

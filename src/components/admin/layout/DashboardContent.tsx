@@ -115,7 +115,7 @@ export default function DashboardContent() {
 
       {/* CHARTS */}
       <div className="grid md:grid-cols-2 gap-8">
-        <ChartCard title="📈 Lượt đánh giá theo thời gian">
+        {/* <ChartCard title="📈 Lượt đánh giá theo thời gian">
           <LineChart data={data.reviewChart} width={500} height={260}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 12 }} />
@@ -162,7 +162,7 @@ export default function DashboardContent() {
               fill="url(#chatColor)"
             />
           </AreaChart>
-        </ChartCard>
+        </ChartCard> */}
       </div>
     </div>
   );
