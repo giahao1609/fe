@@ -46,7 +46,7 @@ export default function DashboardContent() {
       const files = await getFiles();
 
       // Fake số liệu
-      const users = 1287;
+      const users = 12;
       const reviews = Math.max(
         35,
         Math.round(restaurants.length * 12 + Math.random() * 40)
@@ -108,14 +108,14 @@ export default function DashboardContent() {
         <SoftCard
           icon={<i className="fa-solid fa-blog"></i>}
           title="Blog"
-          value="22"
+          value="8"
           color="from-cyan-400 to-cyan-600"
         />{" "}
       </div>
 
       {/* CHARTS */}
       <div className="grid md:grid-cols-2 gap-8">
-        <ChartCard title="📈 Lượt đánh giá theo thời gian">
+        {/* <ChartCard title="📈 Lượt đánh giá theo thời gian">
           <LineChart data={data.reviewChart} width={500} height={260}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 12 }} />
@@ -162,7 +162,7 @@ export default function DashboardContent() {
               fill="url(#chatColor)"
             />
           </AreaChart>
-        </ChartCard>
+        </ChartCard> */}
       </div>
     </div>
   );

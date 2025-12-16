@@ -1,14 +1,14 @@
 "use client";
 
 import {
+  KeyboardEvent,
   RefObject,
   useEffect,
   useMemo,
   useRef,
   useState,
-  KeyboardEvent,
 } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 
 export type ChatRequest = {
@@ -20,8 +20,9 @@ export type ChatRequest = {
 type ChatMessage = {
   id: string;
   role: "user" | "bot";
-  text: string; // với bot: markdown
+  text: string; // bot: markdown
   createdAt: string;
+  images?: string[]; // URL ảnh đi kèm câu trả lời
 };
 
 type ChatApiResponse = {
@@ -29,8 +30,10 @@ type ChatApiResponse = {
   userId: string;
   requestMessage: string;
   reply: string;
+  images?: string[];
   raw?: {
     reply?: string;
+    images?: string[];
     [key: string]: any;
   };
 };
@@ -39,7 +42,7 @@ interface ChatLayoutProps {
   open: boolean;
   setOpen: (v: boolean) => void;
 
-  // props cũ - giữ để không vỡ type, nhưng không dùng
+  // props cũ - giữ cho đủ type, không dùng
   messages: { role: "user" | "bot"; text: string }[];
   input: string;
   setInput: (v: string) => void;
@@ -52,10 +55,10 @@ interface ChatLayoutProps {
   unread?: number;
   onQuickAsk?: (text: string) => void;
 
-  // props mới gợi ý
-  userId?: string; // nếu không truyền, sẽ fallback "anonymous"
-  sessionId?: string; // nếu không truyền, component tự tạo
-  apiBaseUrl?: string; // nếu không truyền, dùng "https://api.food-map.online"
+  // props gợi ý mới
+  userId?: string;
+  sessionId?: string;
+  apiBaseUrl?: string;
 }
 
 const SUGGESTED_QUESTIONS: string[] = [
@@ -69,31 +72,36 @@ function createSessionId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export default function ChatLayout({
-  open,
-  setOpen,
-  isSpeaking,
-  unread = 0,
-  chatEndRef,
-  // legacy props (không dùng)
-  messages: _messagesProp,
-  input: _inputProp,
-  setInput: _setInputProp,
-  sendMessage: _sendMessageProp,
-  startListening: _startListening,
-  listening: _listening,
-  typing: _typing,
-  onQuickAsk: _onQuickAsk,
-  // mới
-  userId,
-  sessionId,
-  apiBaseUrl,
-}: ChatLayoutProps) {
+export default function ChatLayout(props: ChatLayoutProps) {
+  const {
+    open,
+    setOpen,
+    isSpeaking,
+    unread = 0,
+    // legacy props (bỏ qua)
+    chatEndRef: _chatEndRef,
+    messages: _oldMessages,
+    input: _oldInput,
+    setInput: _oldSetInput,
+    sendMessage: _oldSendMessage,
+    startListening: _oldStartListening,
+    listening: _oldListening,
+    typing: _oldTyping,
+    onQuickAsk: _oldOnQuickAsk,
+    // mới
+    userId,
+    sessionId,
+    apiBaseUrl,
+  } = props;
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
 
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const internalChatEndRef = useRef<HTMLDivElement | null>(null);
+
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
   const effectiveUserId = useMemo(
     () => userId || "anonymous",
@@ -110,20 +118,36 @@ export default function ChatLayout({
     [apiBaseUrl],
   );
 
-  // Auto scroll xuống cuối mỗi khi có message mới
-  useEffect(() => {
-    const el = chatEndRef?.current || internalChatEndRef.current;
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
-  }, [messages, chatEndRef]);
+  const isEmpty = messages.length === 0;
 
-  // Helper: stream từng ký tự cho bot reply (markdown)
-  const streamBotReply = (fullText: string) => {
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior,
+    });
+  };
+
+  // tự scroll xuống khi đang ở cuối
+  useEffect(() => {
+    if (!isAtBottom) return;
+    scrollToBottom("auto");
+  }, [messages, isAtBottom]);
+
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const distanceToBottom = scrollHeight - (scrollTop + clientHeight);
+    setIsAtBottom(distanceToBottom < 40);
+  };
+
+  // Typing effect cho bot
+  const streamBotReply = (fullText: string, images?: string[]) => {
     const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const createdAt = new Date().toISOString();
 
-    // Thêm message bot rỗng
     setMessages((prev) => [
       ...prev,
       {
@@ -131,57 +155,76 @@ export default function ChatLayout({
         role: "bot",
         text: "",
         createdAt,
+        images,
       },
     ]);
 
     if (!fullText) return;
 
     let index = 0;
+
     const step = () => {
-      index += 1;
+      index += 2;
       setMessages((prev) =>
         prev.map((m) =>
           m.id === id ? { ...m, text: fullText.slice(0, index) } : m,
         ),
       );
       if (index < fullText.length) {
-        setTimeout(step, 16); // tốc độ chữ
+        setTimeout(step, 20);
       }
     };
 
-    setTimeout(step, 24);
+    setTimeout(step, 80);
   };
 
-  const handleSend = async (overrideText?: string) => {
-    const text = (overrideText ?? inputValue).trim();
+  /**
+   * Gửi message
+   * - overrideText: text truyền vào (ví dụ từ gợi ý)
+   * - fromSuggestion: true nếu click gợi ý
+   */
+  const handleSend = async (
+    overrideText?: string,
+    fromSuggestion: boolean = false,
+  ) => {
+    const textSource = fromSuggestion
+      ? overrideText ?? ""
+      : overrideText ?? inputValue;
+
+    const text = textSource.trim();
     if (!text || isSending) return;
 
-    // Đẩy message user lên UI trước
-    const userMsg: ChatMessage = {
+    const now = new Date().toISOString();
+
+    const userMessage: ChatMessage = {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       role: "user",
       text,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
     };
-    setMessages((prev) => [...prev, userMsg]);
-    if (!overrideText) {
-      setInputValue("");
-    }
 
-    const body: ChatRequest = {
+    // khi gửi thì coi như đang ở cuối
+    setIsAtBottom(true);
+    setMessages((prev) => [...prev, userMessage]);
+
+    // LUÔN clear input ngay khi gửi (kể cả từ gợi ý)
+    setInputValue("");
+
+    const payload: ChatRequest = {
       message: text,
       userId: effectiveUserId,
       sessionId: effectiveSessionId,
     };
 
     setIsSending(true);
+
     try {
       const res = await fetch(`${resolvedApiBase}/api/v1/chat-ai/ask`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -190,19 +233,27 @@ export default function ChatLayout({
 
       const data: ChatApiResponse = await res.json();
 
-      // Lấy reply từ raw.reply hoặc reply (markdown)
       const replyText =
         data?.raw?.reply ||
         data?.reply ||
         "Xin lỗi, hiện tại tôi chưa có câu trả lời phù hợp.";
 
-      // Stream từng chữ (markdown)
-      streamBotReply(replyText);
-    } catch (err) {
-      console.error("Send chat error", err);
-      streamBotReply(
-        "Xin lỗi, hệ thống đang gặp sự cố. Bạn vui lòng thử lại sau một lúc nhé.",
-      );
+      const replyImages: string[] | undefined =
+        data?.raw?.images || data?.images;
+
+      streamBotReply(replyText, replyImages);
+    } catch (error) {
+      console.error("Chat error", error);
+
+      const errorMessage: ChatMessage = {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        role: "bot",
+        text:
+          "Xin lỗi, hệ thống đang gặp sự cố. Bạn vui lòng thử lại sau một lúc nhé.",
+        createdAt: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsSending(false);
     }
@@ -215,179 +266,247 @@ export default function ChatLayout({
     }
   };
 
-  const handleClickSuggested = (q: string) => {
-    setInputValue(q);
-    handleSend(q);
+  const handleClickSuggested = (question: string) => {
+    // Không hiển thị câu gợi ý vào input, nhưng vẫn clear input cũ (do handleSend đã clear)
+    handleSend(question, true);
   };
 
   return (
     <>
-      {/* Floating Button */}
+      {/* Nút nổi */}
       <motion.button
+        type="button"
         onClick={() => setOpen(!open)}
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
-        whileHover={{ scale: 1.08 }}
-        className="fixed bottom-6 right-6 h-16 w-16 rounded-full bg-gradient-to-br from-rose-500 to-rose-400 text-white shadow-2xl flex items-center justify-center text-2xl font-bold z-[9999] outline-none"
-        aria-label={open ? "Đóng chat" : "Mở chat"}
+        whileHover={{ scale: 1.05 }}
+        className="fixed bottom-5 right-5 z-[9999] flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-xl text-white shadow-lg outline-none"
+        aria-label={open ? "Đóng chat trợ lý FoodMap" : "Mở chat trợ lý FoodMap"}
       >
-        {open ? "✖" : "💬"}
-        {unread > 0 && !open && (
-          <span className="absolute -top-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-emerald-500 text-xs font-bold ring-2 ring-white">
+        {open ? "×" : "💬"}
+        {!open && unread > 0 && (
+          <span className="absolute -top-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
       </motion.button>
 
-      {/* Chat Window */}
+      {/* Cửa sổ chat */}
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.95 }}
-            transition={{ duration: 0.25 }}
-            className="fixed bottom-28 right-6 z-[9998] w-[24rem] h-[34rem] backdrop-blur-xl bg-white/80 border border-white/60 shadow-[0_18px_60px_rgba(15,23,42,0.45)] rounded-3xl overflow-hidden"
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ duration: 0.18 }}
+            className="fixed bottom-24 right-5 z-[9998] flex h-[32rem] w-[23rem] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
           >
-            <div className="flex h-full w-full flex-col">
-              {/* Header */}
-              <div className="shrink-0 bg-gradient-to-r from-rose-500 via-rose-400 to-amber-400 text-white px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <img
-                      src="https://i.ibb.co/4nmVmX5H/Clean-Shot-2025-11-10-at-15-24-11.png"
-                      alt="Assistant"
-                      className="w-9 h-9 rounded-full border border-white/70 shadow-md"
-                    />
-                    <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-rose-400" />
-                  </div>
-                  <div className="leading-tight">
-                    <h4 className="font-semibold text-sm">
-                      Trợ lý ảo FoodMap
-                    </h4>
-                    <p className="text-[11px] opacity-95">
-                      {isSpeaking ? "Đang nói…" : "Sẵn sàng giúp bạn tìm quán ăn"}
-                    </p>
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <div className="relative h-8 w-8">
+                  <img
+                    src="https://i.ibb.co/4nmVmX5H/Clean-Shot-2025-11-10-at-15-24-11.png"
+                    alt="FoodMap Assistant"
+                    className="h-8 w-8 rounded-full border border-slate-200 object-cover"
+                  />
+                  <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-slate-50" />
+                </div>
+                <div className="leading-tight">
+                  <p className="text-xs font-semibold text-slate-900">
+                    Trợ lý ảo FoodMap
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    {isSpeaking
+                      ? "Đang trò chuyện với bạn…"
+                      : "Hỏi tôi về quán ăn, địa điểm, đặt bàn…"}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-full p-1 text-slate-500 hover:bg-slate-200/70"
+              >
+                <span className="text-lg leading-none">×</span>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex flex-1 min-h-0 flex-col bg-slate-50">
+              {/* Gợi ý khi chưa có message */}
+              {isEmpty && (
+                <div className="border-b border-slate-200 bg-white px-3 pt-3 pb-2">
+                  <p className="mb-2 text-[11px] font-medium text-slate-600">
+                    Bạn có thể bắt đầu với:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUGGESTED_QUESTIONS.map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => handleClickSuggested(q)}
+                        disabled={isSending}
+                        className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] text-slate-700 hover:border-slate-300 hover:bg-white disabled:opacity-60"
+                      >
+                        {q}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="text-white/90 text-lg hover:scale-110 hover:text-white transition-transform"
+              )}
+
+              {/* Danh sách messages */}
+              <div className="flex-1 min-h-0">
+                <div
+                  ref={scrollContainerRef}
+                  onScroll={handleScroll}
+                  className="flex h-full flex-col space-y-3 overflow-y-auto px-3 py-3 text-sm"
                 >
-                  ✖
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="flex-1 min-h-0 bg-gradient-to-b from-slate-50/90 via-slate-50/60 to-slate-100/90 flex flex-col">
-                {/* Gợi ý câu hỏi – chỉ hiện KHI CHƯA CÓ message nào */}
-                {messages.length === 0 && (
-                  <div className="px-4 pt-3 pb-2 border-b border-slate-200/70 bg-white/80">
-                    <p className="text-[11px] font-semibold text-slate-500 mb-2">
-                      Bạn có thể bắt đầu với một trong các câu hỏi sau:
-                    </p>
-                    <div className="flex flex-col gap-1.5">
-                      {SUGGESTED_QUESTIONS.map((q) => (
-                        <button
-                          key={q}
-                          type="button"
-                          onClick={() => handleClickSuggested(q)}
-                          className="text-[11px] text-left px-0 py-0 text-slate-600 hover:text-rose-600 hover:underline"
-                        >
-                          • {q}
-                        </button>
-                      ))}
+                  {isEmpty && (
+                    <div className="mt-4 text-center text-[11px] text-slate-400">
+                      Hãy nhập câu hỏi hoặc chọn một gợi ý phía trên để bắt đầu
+                      trò chuyện.
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Messages */}
-                <div className="flex-1 min-h-0">
-                  <div className="h-full overflow-y-auto px-3 py-3 space-y-3 text-sm">
-                    {messages.length === 0 && (
-                      <div className="mt-4 text-center text-xs text-slate-400">
-                        Hãy nhập câu hỏi hoặc chọn một gợi ý phía trên để bắt đầu
-                        trò chuyện.
-                      </div>
-                    )}
-
-                    {messages.map((m) => {
-                      const isUser = m.role === "user";
-                      return (
+                  {messages.map((m) => {
+                    const isUser = m.role === "user";
+                    return (
+                      <div
+                        key={m.id}
+                        className={`flex ${
+                          isUser ? "justify-end" : "justify-start"
+                        }`}
+                      >
                         <div
-                          key={m.id}
-                          className={`flex ${
-                            isUser ? "justify-end" : "justify-start"
+                          className={`max-w-[80%] rounded-2xl px-3 py-2 ${
+                            isUser
+                              ? "rounded-br-sm bg-slate-900 text-white"
+                              : "rounded-bl-sm bg-white text-slate-900 border border-slate-200"
                           }`}
                         >
-                          <div
-                            className={`max-w-[82%] rounded-2xl px-3 py-2 shadow-sm ${
-                              isUser
-                                ? "bg-rose-500 text-white rounded-br-none"
-                                : "bg-white/95 text-slate-800 rounded-bl-none border border-slate-100"
-                            }`}
-                          >
-                            {isUser ? (
-                              <p className="whitespace-pre-wrap break-words">
+                          {/* Text */}
+                          {isUser ? (
+                            <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">
+                              {m.text}
+                            </p>
+                          ) : (
+                            <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-slate-900 prose-a:text-slate-900 prose-a:underline">
+                              <ReactMarkdown
+                                components={{
+                                  p: ({ node, ...props }) => (
+                                    <p
+                                      {...props}
+                                      className="whitespace-pre-wrap text-[13px] leading-relaxed"
+                                    />
+                                  ),
+                                  ul: ({ node, ...props }) => (
+                                    <ul
+                                      {...props}
+                                      className="list-disc list-inside space-y-0.5"
+                                    />
+                                  ),
+                                  li: ({ node, ...props }) => (
+                                    <li
+                                      {...props}
+                                      className="text-[13px] leading-relaxed"
+                                    />
+                                  ),
+                                  a: ({ node, ...props }) => (
+                                    <a
+                                      {...props}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    />
+                                  ),
+                                  img: ({ node, ...props }) => (
+                                    <div className="mt-2 overflow-hidden rounded-xl border border-slate-200">
+                                      <div className="aspect-[4/3] w-full">
+                                        <img
+                                          {...props}
+                                          loading="lazy"
+                                          className="h-full w-full object-cover"
+                                        />
+                                      </div>
+                                    </div>
+                                  ),
+                                }}
+                              >
                                 {m.text}
-                              </p>
-                            ) : (
-                              <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-slate-900">
-                                <ReactMarkdown
-                                  components={{
-                                    p: ({ node, ...props }) => (
-                                      <p
-                                        {...props}
-                                        className="text-sm leading-relaxed whitespace-pre-wrap"
-                                      />
-                                    ),
-                                    ul: ({ node, ...props }) => (
-                                      <ul
-                                        {...props}
-                                        className="list-disc list-inside space-y-0.5"
-                                      />
-                                    ),
-                                    li: ({ node, ...props }) => (
-                                      <li
-                                        {...props}
-                                        className="text-sm leading-relaxed"
-                                      />
-                                    ),
-                                  }}
-                                >
-                                  {m.text}
-                                </ReactMarkdown>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                              </ReactMarkdown>
+                            </div>
+                          )}
 
-                    <div ref={internalChatEndRef} />
-                  </div>
+                          {/* Ảnh gợi ý từ API */}
+                          {!isUser && m.images && m.images.length > 0 && (
+                            <div className="mt-2 flex flex-col gap-2">
+                              {m.images.map((src, index) => (
+                                <div
+                                  key={`${m.id}-img-${index}`}
+                                  className="overflow-hidden rounded-xl border border-slate-200"
+                                >
+                                  <div className="aspect-[4/3] w-full">
+                                    <img
+                                      src={src}
+                                      loading="lazy"
+                                      alt={`Ảnh gợi ý ${index + 1}`}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Typing indicator */}
+                  {isSending && (
+                    <div className="flex justify-start">
+                      <div className="inline-flex items-center gap-1.5 rounded-2xl rounded-bl-sm border border-slate-200 bg-white px-3 py-1.5 text-[11px] text-slate-500">
+                        <span className="flex gap-1">
+                          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
+                          <span
+                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400"
+                            style={{ animationDelay: "0.12s" }}
+                          />
+                          <span
+                            className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400"
+                            style={{ animationDelay: "0.24s" }}
+                          />
+                        </span>
+                        <span>Đang trả lời…</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={internalChatEndRef} />
                 </div>
               </div>
+            </div>
 
-              {/* Input */}
-              <div className="shrink-0 border-t border-slate-200 bg-white/95 px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Nhập câu hỏi về quán ăn, địa chỉ, đặt bàn..."
-                    className="flex-1 rounded-full border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-rose-400 focus:border-transparent bg-slate-50"
-                  />
-                  <button
-                    onClick={() => handleSend()}
-                    disabled={isSending || !inputValue.trim()}
-                    className="inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white bg-rose-500 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-rose-600 transition"
-                  >
-                    {isSending ? "Đang gửi…" : "Gửi"}
-                  </button>
-                </div>
+            {/* Input */}
+            <div className="border-t border-slate-200 bg-white px-3 py-2.5">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Nhập câu hỏi về quán ăn, địa chỉ, đặt bàn..."
+                  className="flex-1 rounded-full border border-slate-300 bg-slate-50 px-3 py-2 text-[13px] outline-none focus:border-slate-400 focus:ring-0"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSend()}
+                  disabled={isSending || !inputValue.trim()}
+                  className="inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-[13px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSending ? "Đang gửi…" : "Gửi"}
+                </button>
               </div>
             </div>
           </motion.div>
